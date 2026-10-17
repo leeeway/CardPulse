@@ -4,23 +4,49 @@
 
 [简体中文](README.md) · [繁體中文](README.zh-TW.md) · **English**
 
-CardPulse processes credit card PDF statements locally. Import a supported statement to filter transactions by merchant, currency, or direction, check whether statement balances reconcile, and estimate cashback using the built-in rules. To keep your records, encrypt and save them in your current browser with a master password.
+CardPulse processes credit card PDF statements locally. Import a supported statement to filter transactions by merchant, currency, or direction, check whether statement balances reconcile, and estimate cashback using the built-in rules. To keep your records, encrypt and save them in a local vault with a master password.
 
 It is designed for people who want to organize several months of statements while keeping transaction details on their own device. Workspaces cover HSBC, BOCHK, CNCBI, Hang Seng, Standard Chartered, Citi, DBS, and other banks. HSBC has a parser for specific PDF layouts; every bank supports standard CSV transactions and custom campaigns.
 
-[Quick start](#quick-start) · [Using CardPulse](#using-cardpulse) · [Supported features and formats](#supported-features-and-formats) · [Privacy and data](#privacy-and-data) · [Development and contributions](#development-and-contributions)
+[Desktop downloads](#desktop-downloads-and-installation) · [Quick start](#quick-start) · [Using CardPulse](#using-cardpulse) · [Supported features and formats](#supported-features-and-formats) · [Privacy and data](#privacy-and-data) · [Development and contributions](#development-and-contributions)
 
 ## What it does
 
 - **Organize transactions**: Import PDFs / standard CSVs in batches and view transaction dates, merchants, currencies, amounts, and detected payment channels. Search, filter, and export to CSV.
 - **Check statement balances**: Reconcile each currency using “opening balance + debits − credits = closing balance,” with a status and any difference shown.
 - **Estimate cashback**: Apply the built-in Pulse base and bonus rules, and track annual and half-year spending allowances. Refunds reduce rewards without restoring used allowances.
-- **Save encrypted records**: Store encrypted transactions, statement summaries, and campaign configurations in the current browser. Restore them with your master password after reloading, or manually lock or clear the vault.
+- **Save encrypted records**: Store encrypted transactions, statement summaries, and campaign configurations in the current browser or desktop app data directory. Restore them with your master password after reloading, or manually lock or clear the vault.
 - **Reduce import mistakes**: Detect repeated PDF content and flag parsing issues and unsaved changes.
+
+## Desktop downloads and installation
+
+Download the `v0.2.0-beta.1` desktop preview from [GitHub Releases](https://github.com/leeeway/CardPulse/releases). End users do not need Node.js, a development server, an account, or a business backend.
+
+| System | Download | Installation |
+| --- | --- | --- |
+| macOS 13+ · Apple silicon | `CardPulse-0.2.0-beta.1-mac-arm64.dmg` | Open the DMG and drag CardPulse to Applications |
+| macOS 13+ · Intel | `CardPulse-0.2.0-beta.1-mac-x64.dmg` | Open the DMG and drag CardPulse to Applications |
+| Windows 10 / 11 · x64 | `CardPulse-0.2.0-beta.1-win-x64.exe` | Run the per-user installation wizard and choose a destination |
+
+ZIP archives are also provided for Mac. Mac packages use ad-hoc signing without Apple Developer ID signing or notarization; Windows packages have no Authenticode publisher signature. Your OS may block the first launch. After checking the source and SHA-256, decide whether to use macOS System Settings → Privacy & Security → Open Anyway, or the Windows SmartScreen prompts. Do not disable system-wide security protections.
+
+The release includes `SHA256SUMS.txt`. Place it alongside downloaded packages. On macOS, run `shasum -a 256 -c SHA256SUMS.txt`; entries for packages you did not download report missing files and can be ignored. On Windows PowerShell, compare `Get-FileHash .\CardPulse-0.2.0-beta.1-win-x64.exe -Algorithm SHA256` with the manifest.
+
+This is the first desktop beta. Packaged Mac apps undergo startup, parsing, and persistence tests. The Windows installer is cross-built on macOS and has not undergone native Windows runtime acceptance testing. Report issues through Issues. Export an encrypted backup before uninstalling.
+
+Desktop records are stored in the current OS user profile: `~/Library/Application Support/CardPulse/vault.cardpulse` on macOS, or `%APPDATA%/CardPulse/vault.cardpulse` on Windows. Updates reuse this directory; installers contain no personal statements. The Windows uninstaller does not actively delete application data, but manual system cleanup may remove it.
+
+### Offline operation and migration
+
+- Startup no longer requests exchange rates automatically. Enter a rate manually, or explicitly select the online reference-rate button. The desktop renderer blocks remote network resources; bank reference links open in your system browser.
+- The web app uses IndexedDB; the desktop app uses a local encrypted file. They do not sync automatically.
+- Unlock your existing web vault and export an encrypted backup. Restore that backup in the desktop app with its password. After confirmation, restore replaces the destination’s transactions, campaigns, and rate settings. Back up existing records first.
+- `.cardpulse` backups contain AES-GCM ciphertext, not CSV. Forgotten passwords cannot be recovered. A backup includes the current workspace but does not replace saving the local vault.
+- There is no cloud sync, telemetry, or automatic updater. Download a new installer to upgrade.
 
 ## Quick start
 
-Install Node.js and npm; **Node.js 22.13 or later** is recommended. Your browser must support Web Crypto, Web Workers, and IndexedDB. Access the app through its local development address or HTTPS.
+Install Node.js and npm; **Node.js 22.20 or later** is recommended. Your browser must support Web Crypto, Web Workers, and IndexedDB. Access the app through its local development address or HTTPS.
 
 ```bash
 git clone https://github.com/leeeway/CardPulse.git
@@ -98,10 +124,10 @@ Select Add campaign and configure the bank, card or last four digits, currency, 
 ## Privacy and data
 
 - **Statements are processed locally**: The application has no business backend that receives statements. PDF parsing and cashback calculation run in your browser.
-- **Saved data is encrypted**: Web Crypto derives a key with PBKDF2 (SHA-256, 100,000 iterations), then encrypts the data with AES-256-GCM. Ciphertext is stored in IndexedDB. The master password is neither uploaded nor persisted.
+- **Saved data is encrypted**: Web Crypto derives a key with PBKDF2 (SHA-256, 100,000 iterations), then encrypts the data with AES-256-GCM. The web app stores ciphertext in IndexedDB; desktop builds use a local encrypted file. The master password is neither uploaded nor persisted.
 - **Unlocked records are readable in memory**: Transactions remain in application memory while unlocked. Locking clears the current transaction and statement state; the next unlock restores the last saved version.
-- **Public exchange rates require a network request**: The app requests an HKD/CNY reference rate from [Frankfurter](https://api.frankfurter.dev/v2/rate/HKD/CNY), without sending statement content, using `credentials: 'omit'` and `referrerPolicy: 'no-referrer'`. Local statement processing does not mean the entire app makes no network requests.
-- **The vault belongs to the current browser and site address**: Changing devices, browsers, or site addresses does not sync records automatically. A forgotten master password cannot be recovered, and clearing site data may delete the vault.
+- **Public exchange rates require a network request**: Only when you explicitly request an online update, the app fetches an HKD/CNY reference rate from [Frankfurter](https://api.frankfurter.dev/v2/rate/HKD/CNY), without sending statement content, using `credentials: 'omit'` and `referrerPolicy: 'no-referrer'`. Local statement processing does not mean the entire app makes no network requests.
+- **The web vault belongs to the current browser and site address**: Changing devices, browsers, or site addresses does not sync records automatically. A forgotten master password cannot be recovered, and clearing site data may delete the vault.
 - **CSV files are plaintext**: Export escapes cells that could trigger spreadsheet formulas, but transaction details remain directly readable. Store exported files appropriately.
 
 “清空数据” (Clear data) deletes current transactions, campaigns, and the local vault after confirmation. “锁定保险库” (Lock vault) prompts before discarding unsaved changes; saved records remain.
@@ -138,6 +164,17 @@ Main modules:
 Report issues or propose improvements through [Issues](https://github.com/leeeway/CardPulse/issues). For parsing problems, include the bank and card type, expected result, and a redacted layout example. Do not publish real card numbers, names, transaction details, or PDF passwords.
 
 When changing features, support coverage, or usage steps, update all three language editions and keep their section order and feature status aligned. Include redacted or synthetic regression cases when adding a card type or parsing rule.
+
+### Desktop development and packaging
+
+```bash
+npm run desktop:dev    # Build and launch Electron
+npm run test:desktop   # Test local storage and backups in an isolated profile
+npm run desktop:mac    # macOS: Apple silicon + Intel, DMG / ZIP
+npm run desktop:win    # Windows x64: NSIS installer
+```
+
+Node.js 24.12+ is recommended. Build tools need a network connection to download Electron; installed apps do not depend on those tools. Mac packages must be built on macOS. Output is written to `release/`. An inactive [desktop release workflow template](docs/desktop-release.yml) is included; GitHub `workflow` permission is required to enable native builds and Release publishing.
 
 ## Planned work
 

@@ -4,23 +4,49 @@
 
 [简体中文](README.md) · **繁體中文** · [English](README.en.md)
 
-CardPulse 是一個在本機處理資料的信用卡 PDF 結單分析工具。匯入支援的結單後，可以按商戶、幣種和收支篩選交易，檢查結單結欠是否一致，並查看依內建規則計算的回贈估算。需要保留紀錄時，可使用主密碼加密儲存至目前的瀏覽器。
+CardPulse 是一個在本機處理資料的信用卡 PDF 結單分析工具。匯入支援的結單後，可以按商戶、幣種和收支篩選交易，檢查結單結欠是否一致，並查看依內建規則計算的回贈估算。需要保留紀錄時，可使用主密碼加密儲存至本機保險庫。
 
 適合希望集中整理多個月份結單，同時讓交易明細留在自己裝置上的使用者。目前提供 HSBC、中銀香港、信銀國際、恒生、渣打、花旗、星展及其他銀行工作區。HSBC 提供指定 PDF 版面解析；所有銀行均可透過標準 CSV 整理交易及設定自訂活動。
 
-[快速開始](#快速開始) · [使用流程](#使用流程) · [支援範圍](#支援範圍) · [私隱與資料](#私隱與資料) · [開發與貢獻](#開發與貢獻)
+[桌面下載](#桌面版下載與安裝) · [快速開始](#快速開始) · [使用流程](#使用流程) · [支援範圍](#支援範圍) · [私隱與資料](#私隱與資料) · [開發與貢獻](#開發與貢獻)
 
 ## 能做甚麼
 
 - **整理交易**：批次匯入 PDF / 標準 CSV，查看交易日期、商戶、幣種、金額及識別到的支付渠道；支援搜尋、篩選和 CSV 匯出。
 - **檢查結單**：按幣種核對「上期結欠 + 支出 − 入賬 = 本期結欠」，顯示對賬結果及差額。
 - **估算回贈**：依內建 Pulse 規則計算基本及額外獎賞，顯示年度、半年度簽賬額度的使用情況；退款會扣回獎賞，但不釋放已佔用額度。
-- **加密儲存**：將交易、結單摘要與活動設定加密儲存於目前的瀏覽器，重新整理後輸入主密碼還原；亦可手動鎖定或清除。
+- **加密儲存**：將交易、結單摘要與活動設定加密儲存於目前的瀏覽器或桌面應用程式資料目錄，重新整理後輸入主密碼還原；亦可手動鎖定或清除。
 - **減少誤操作**：按 PDF 檔案內容識別重複匯入，提示解析異常及尚未儲存的修改。
+
+## 桌面版下載與安裝
+
+從 [GitHub Releases](https://github.com/leeeway/CardPulse/releases) 下載 `v0.2.0-beta.1` 桌面預覽版。安裝後即可使用，毋須 Node.js、瀏覽器服務、帳戶或業務伺服器。
+
+| 系統 | 下載檔案 | 安裝方式 |
+| --- | --- | --- |
+| macOS 13+ · Apple 晶片 | `CardPulse-0.2.0-beta.1-mac-arm64.dmg` | 開啟 DMG，將 CardPulse 拖至「應用程式」 |
+| macOS 13+ · Intel | `CardPulse-0.2.0-beta.1-mac-x64.dmg` | 開啟 DMG，將 CardPulse 拖至「應用程式」 |
+| Windows 10 / 11 · x64 | `CardPulse-0.2.0-beta.1-win-x64.exe` | 執行安裝精靈，可為目前使用者選擇安裝目錄 |
+
+Mac 亦提供 ZIP。此預覽版的 Mac 套件只有本機 ad-hoc 簽署，未使用 Apple Developer ID 簽署或公證；Windows 套件沒有 Authenticode 發行者簽署。系統可能攔截首次啟動。確認來源及 SHA-256 後，可依 macOS「系統設定 → 私隱與保安 → 仍要開啟」或 Windows SmartScreen 提示自行決定是否執行。請勿關閉系統全域安全保護。
+
+Release 提供 `SHA256SUMS.txt`。將其與下載套件放在同一目錄，在 macOS 可執行 `shasum -a 256 -c SHA256SUMS.txt` 校驗已下載檔案；未下載的檔案會報告缺失，可忽略其缺失提示。在 Windows PowerShell 可執行 `Get-FileHash .\CardPulse-0.2.0-beta.1-win-x64.exe -Algorithm SHA256` 並與清單比對。
+
+這是首個桌面測試版。Mac 打包應用程式會進行啟動、解析及持久化測試；Windows 安裝套件由 macOS 交叉建置，尚未經原生 Windows 執行驗收。問題可透過 Issues 回報。解除安裝前建議先匯出加密備份。
+
+桌面資料儲存在目前系統使用者的應用程式資料目錄：macOS 為 `~/Library/Application Support/CardPulse/vault.cardpulse`，Windows 為 `%APPDATA%/CardPulse/vault.cardpulse`。更新沿用此目錄，安裝套件不包含個人結單。解除安裝程式不主動刪除 Windows 資料目錄；手動清理系統資料仍可能刪除保險庫。
+
+### 預設離線與遷移
+
+- 啟動不再自動查詢匯率；可手動填寫，只有點擊「連線更新參考匯率」才請求公開資料。桌面介面本身阻止遠端網絡資源，銀行資料連結交由系統瀏覽器開啟。
+- 網頁版使用 IndexedDB，桌面版使用本機加密檔案。兩者不會自動同步。
+- 在網頁中解鎖舊資料，點擊「匯出加密備份」，再於桌面版點擊「還原加密備份」，輸入備份密碼即可遷移。還原會在確認後取代目前裝置的交易、活動及匯率設定；請先備份現有紀錄。
+- `.cardpulse` 備份為 AES-GCM 密文，並非 CSV。忘記密碼無法還原。匯出備份包含目前工作區，但不會代替「儲存至加密資料庫」。
+- 目前沒有雲端同步、遙測或自動更新；升級時下載新版安裝套件。
 
 ## 快速開始
 
-需要 Node.js 和 npm，建議使用 **Node.js 22.13 或更新版本**。瀏覽器須支援 Web Crypto、Web Worker 和 IndexedDB；請透過本機開發網址或 HTTPS 存取應用程式。
+需要 Node.js 和 npm，建議使用 **Node.js 22.20 或更新版本**。瀏覽器須支援 Web Crypto、Web Worker 和 IndexedDB；請透過本機開發網址或 HTTPS 存取應用程式。
 
 ```bash
 git clone https://github.com/leeeway/CardPulse.git
@@ -98,10 +124,10 @@ day,transactionDay,description,amount,currency,direction,category,last4,channel
 ## 私隱與資料
 
 - **結單在本機處理**：應用程式沒有接收結單的業務後端，PDF 解析和回贈計算均在瀏覽器內完成。
-- **儲存時加密**：使用 Web Crypto 的 PBKDF2（SHA-256，100,000 次迭代）衍生金鑰，再以 AES-256-GCM 加密，密文存放於 IndexedDB。主密碼不會上載或持久儲存。
+- **儲存時加密**：使用 Web Crypto 的 PBKDF2（SHA-256，100,000 次迭代）衍生金鑰，再以 AES-256-GCM 加密，網頁版密文存放於 IndexedDB，桌面版存放於本機加密檔案。主密碼不會上載或持久儲存。
 - **解鎖後可查看明文**：交易在解鎖期間存在於應用程式記憶體中。手動鎖定會清除目前交易及結單狀態，下次解鎖還原最後儲存的版本。
-- **存在公開匯率請求**：應用程式會請求 [Frankfurter](https://api.frankfurter.dev/v2/rate/HKD/CNY) 的 HKD/CNY 參考匯率，不傳送結單內容，並設定 `credentials: 'omit'` 和 `referrerPolicy: 'no-referrer'`。這不代表整個應用程式完全不連線。
-- **本機資料庫依賴目前瀏覽器與網站網址**：切換裝置、瀏覽器或存取網址不會自動同步資料。忘記主密碼無法找回；清除網站資料亦可能刪除保險庫。
+- **存在公開匯率請求**：僅在使用者點擊連線更新時，應用程式才請求 [Frankfurter](https://api.frankfurter.dev/v2/rate/HKD/CNY) 的 HKD/CNY 參考匯率，不傳送結單內容，並設定 `credentials: 'omit'` 和 `referrerPolicy: 'no-referrer'`。這不代表整個應用程式完全不連線。
+- **網頁版本機資料庫依賴目前瀏覽器與網站網址**：切換裝置、瀏覽器或存取網址不會自動同步資料。忘記主密碼無法找回；清除網站資料亦可能刪除保險庫。
 - **CSV 是明文檔案**：匯出會轉義可能觸發試算表公式的儲存格，但交易內容仍可直接讀取，請妥善保管。
 
 「清除資料」會在確認後刪除目前交易、活動及本機保險庫。「鎖定保險庫」遇到尚未儲存的修改時會提示是否捨棄，已儲存紀錄保留。
@@ -138,6 +164,17 @@ npm run test:browser
 歡迎透過 [Issues](https://github.com/leeeway/CardPulse/issues) 回報問題或提交改進。解析問題請提供銀行與卡種、預期結果和已脫敏的版面範例；請勿公開真實卡號、姓名、交易明細或 PDF 密碼。
 
 修改功能、支援範圍或使用流程時，請同步更新三個語言版本，保持章節順序和功能狀態一致。新增卡種或解析規則時，請附上脫敏或合成回歸案例。
+
+### 桌面開發與建置
+
+```bash
+npm run desktop:dev    # 建置並啟動 Electron
+npm run test:desktop   # 以隔離測試設定驗證本機儲存與備份
+npm run desktop:mac    # macOS：Apple 晶片 + Intel，DMG / ZIP
+npm run desktop:win    # Windows x64：NSIS 安裝套件
+```
+
+建議使用 Node.js 24.12+。桌面建置工具下載 Electron 時需要連線，安裝後的應用程式不依賴建置工具。Mac 套件須在 macOS 建置。輸出位於 `release/`。儲存庫提供尚未啟用的[桌面發佈工作流程範本](docs/desktop-release.yml)；具備 GitHub `workflow` 權限後可啟用雙平台建置及 Release 發佈。
 
 ## 後續計劃
 
