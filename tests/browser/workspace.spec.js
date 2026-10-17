@@ -18,11 +18,11 @@ test('multi-bank workspace, custom rewards, preferences, and encrypted persisten
     'day,transactionDay,description,amount,currency,direction,category,last4,channel\n2026-10-01,2026-10-01,MY ONLINE SHOP,1000.00,HKD,debit,spend,1234,online\n2026-10-02,2026-10-01,MY ONLINE SHOP,100.00,HKD,credit,credit,1234,online\n2026-10-03,2026-10-03,ANNUAL FEE,20.00,HKD,debit,fee,1234,standard';
   await page.goto('/');
   await page.waitForFunction(
-    () => !document.querySelector('[type=file]').disabled,
+    () => !document.querySelector('input[accept=".pdf,.csv"]').disabled,
   );
   await page.getByLabel('导入银行', { exact: true }).selectOption('bochk');
   await page
-    .locator('input[type=file]')
+    .locator('input[accept=".pdf,.csv"]')
     .setInputFiles({
       name: 'boc.csv',
       mimeType: 'text/csv',
@@ -60,7 +60,7 @@ test('multi-bank workspace, custom rewards, preferences, and encrypted persisten
   await page.locator('.bank-tile').filter({ hasText: '全部银行' }).click();
   await page.getByLabel('导入银行', { exact: true }).selectOption('hsbc');
   await page
-    .locator('input[type=file]')
+    .locator('input[accept=".pdf,.csv"]')
     .setInputFiles({
       name: 'plain.pdf',
       mimeType: 'application/pdf',

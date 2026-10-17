@@ -8,14 +8,18 @@ function openDatabase() {
     const request = indexedDB.open('CardPulse_DB', 1);
     request.onupgradeneeded = () => {
       const db = request.result;
-      if (!db.objectStoreNames.contains(STORE_NAME)) db.createObjectStore(STORE_NAME, { keyPath: 'id' });
+      if (!db.objectStoreNames.contains(STORE_NAME))
+        db.createObjectStore(STORE_NAME, { keyPath: 'id' });
     };
     request.onsuccess = () => {
       request.result.onversionchange = () => request.result.close();
       resolve(request.result);
     };
     request.onerror = () => reject(request.error);
-    request.onblocked = () => reject(new Error('本地库被其他页面占用，请关闭其他 CardPulse 页面后重试'));
+    request.onblocked = () =>
+      reject(
+        new Error('本地库被其他页面占用，请关闭其他 CardPulse 页面后重试'),
+      );
   });
 }
 
@@ -35,18 +39,29 @@ async function accessVault(mode, operation) {
 }
 
 export async function hasEncryptedVault() {
+  if (globalThis.cardpulseDesktop)
+    return Boolean(await globalThis.cardpulseDesktop.readVault());
   // A storage failure must never be interpreted as an empty vault.
-  return Boolean(await accessVault('readonly', store => store.get('vault_payload')));
+  return Boolean(
+    await accessVault('readonly', (store) => store.get('vault_payload')),
+  );
 }
 
 export async function saveToVault(data, password) {
   const payload = await encryptData(data, password);
-  await accessVault('readwrite', store => store.put({ id: 'vault_payload', payload, updatedAt: Date.now() }));
+  if (globalThis.cardpulseDesktop)
+    return globalThis.cardpulseDesktop.writeVault(payload);
+  await accessVault('readwrite', (store) =>
+    store.put({ id: 'vault_payload', payload, updatedAt: Date.now() }),
+  );
 }
 
 export async function loadFromVault(password) {
-  const record = await accessVault('readonly', store => store.get('vault_payload'));
-  if (!record) return null;
+  const desktop = globalThis.cardpulseDesktop;
+  const record = desktop
+    ? { payload: await desktop.readVault() }
+    : await accessVault('readonly', (store) => store.get('vault_payload'));
+  if (!record?.payload) return null;
   try {
     return await decryptData(record.payload, password);
   } catch {
@@ -55,5 +70,7 @@ export async function loadFromVault(password) {
 }
 
 export async function clearVault() {
-  await accessVault('readwrite', store => store.clear());
+  if (globalThis.cardpulseDesktop)
+    return globalThis.cardpulseDesktop.clearVault();
+  await accessVault('readwrite', (store) => store.clear());
 }

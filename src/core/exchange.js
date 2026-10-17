@@ -7,11 +7,14 @@ export const RATE_SOURCE_URL = 'https://api.frankfurter.dev/v2/rate/HKD/CNY';
 
 export async function fetchHkdCnyRate({ signal } = {}) {
   try {
+    if (globalThis.cardpulseDesktop)
+      return await globalThis.cardpulseDesktop.fetchReferenceRate();
     const res = await fetch(RATE_SOURCE_URL, {
       method: 'GET',
       credentials: 'omit',
       referrerPolicy: 'no-referrer',
-      signal
+      redirect: 'error',
+      signal,
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
@@ -22,14 +25,14 @@ export async function fetchHkdCnyRate({ signal } = {}) {
     return {
       rate,
       date: data.date || new Date().toISOString().slice(0, 10),
-      source: 'Frankfurter'
+      source: 'Frankfurter',
     };
   } catch (err) {
     if (signal?.aborted) throw err;
     return {
       rate: null,
       date: '汇率暂不可用',
-      isFallback: true
+      isFallback: true,
     };
   }
 }

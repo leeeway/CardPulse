@@ -9,6 +9,8 @@ import {
   Eye,
   FileText,
   ArrowUpRight,
+  Archive,
+  FolderOpen,
 } from 'lucide-react';
 import { DEMO_TRANSACTIONS } from './core/demo.js';
 import {
@@ -40,6 +42,16 @@ import { translate, channelText } from './core/i18n.js';
 import { normalizeWorkspace, emptyWorkspace } from './core/workspace.js';
 import CampaignPanel from './components/CampaignPanel.jsx';
 import BankWorkspace from './components/BankWorkspace.jsx';
+import DataSettings from './components/DataSettings.jsx';
+import PdfPasswordDialog from './components/PdfPasswordDialog.jsx';
+import {
+  encryptWorkspace,
+  decryptWorkspace,
+  serializeBackup,
+  parseBackup,
+  MAX_BACKUP_BYTES,
+} from './core/backup.js';
+import { isIsoDate } from './core/campaigns.js';
 
 const emptyFilters = () => ({
   search: '',
@@ -73,7 +85,10 @@ export default function App() {
   const [dirty, setDirty] = useState(false);
   const [notice, setNotice] = useState([]);
   const [isDemo, setIsDemo] = useState(false);
-  const [rateInfo, setRateInfo] = useState({ rate: null });
+  const rateInfo = workspace.exchangeRate || { rate: null, isFallback: true };
+  const [rateBusy, setRateBusy] = useState(false);
+  const [pendingBackup, setPendingBackup] = useState(null);
+  const [pdfPasswordRequest, setPdfPasswordRequest] = useState(null);
   const [filters, setFilters] = useState(emptyFilters);
   const [vaultLocked, setVaultLocked] = useState(false);
   const [hasVault, setHasVault] = useState(false);
@@ -87,7 +102,10 @@ export default function App() {
   const [loadingFile, setLoadingFile] = useState(false);
   const busyRef = useRef(false);
   const fileInputRef = useRef(null);
-  const unavailable = loadingFile || vaultBusy || vaultLocked || !vaultReady;
+  const backupInputRef = useRef(null);
+  const pdfPasswordResolver = useRef(null);
+  const unavailable =
+    loadingFile || vaultBusy || rateBusy || vaultLocked || !vaultReady;
 
   useEffect(() => {
     document.documentElement.lang = preferences.locale;
@@ -96,10 +114,6 @@ export default function App() {
     savePreferences(preferences);
   }, [preferences]);
   useEffect(() => {
-    const controller = new AbortController();
-    fetchHkdCnyRate({ signal: controller.signal })
-      .then(setRateInfo)
-      .catch(() => {});
     hasEncryptedVault()
       .then((exists) => {
         setHasVault(exists);
@@ -107,7 +121,9 @@ export default function App() {
         setVaultReady(true);
       })
       .catch(() => setNotice([{ text: '无法访问本地库，请刷新后重试。' }]));
-    return () => controller.abort();
+    return () => {
+      pdfPasswordResolver.current?.(null);
+    };
   }, []);
   useEffect(() => {
     if (!dirty) return;
@@ -148,6 +164,7 @@ export default function App() {
       setMasterPassword('');
       setPasswordError('');
       setShowPasswordModal(false);
+      setPendingBackup(null);
     }
   };
   const clearMemory = () => {
@@ -237,9 +254,13 @@ export default function App() {
                 });
               } catch (error) {
                 if (error.code !== 'password') throw error;
-                password = prompt(
-                  `${file.name}：${t(error.message)}。${t('请输入 PDF 密码（仅本地使用，取消则跳过）')}`,
-                );
+                password = await new Promise((resolve) => {
+                  pdfPasswordResolver.current = resolve;
+                  setPdfPasswordRequest({
+                    fileName: file.name,
+                    error: error.message,
+                  });
+                });
                 if (password === null) break;
               }
             }
@@ -290,6 +311,39 @@ export default function App() {
         setVaultLocked(false);
         setDirty(false);
         setNotice([]);
+      } else if (passwordMode === 'restore') {
+        const data = await decryptWorkspace(pendingBackup, masterPassword);
+        if (
+          !confirm(
+            t(
+              '恢复将替换本地交易、活动和汇率设置，请先备份现有数据。确认恢复？',
+            ),
+          )
+        )
+          return;
+        await saveToVault(data, masterPassword);
+        setWorkspace(data);
+        setHasVault(true);
+        setVaultLocked(false);
+        setDirty(false);
+        setIsDemo(false);
+        setActiveBank('all');
+        setFilters(emptyFilters());
+        setNotice([{ text: '已恢复加密备份' }]);
+      } else if (passwordMode === 'backup') {
+        if (hasVault && !(await loadFromVault(masterPassword)))
+          throw new Error('本地库不存在，请刷新后重试');
+        const payload = await encryptWorkspace(workspace, masterPassword);
+        if (globalThis.cardpulseDesktop) {
+          if (!(await globalThis.cardpulseDesktop.exportBackup(payload)))
+            return;
+        } else
+          download(
+            serializeBackup(payload),
+            `CardPulse-${getHongKongDate()}.cardpulse`,
+            'application/json',
+          );
+        setNotice([{ text: '已导出加密备份，未保存的修改仍需保存到加密库' }]);
       } else {
         if (hasVault && !(await loadFromVault(masterPassword)))
           throw new Error('本地库不存在，请刷新后重试');
@@ -302,6 +356,7 @@ export default function App() {
       setMasterPassword('');
       setShowPasswordModal(false);
       setPasswordError('');
+      setPendingBackup(null);
     } catch (error) {
       setPasswordError(error.message || '操作失败，请重试');
     } finally {
@@ -316,8 +371,92 @@ export default function App() {
       setDirty(
         hasVault ||
           updated.transactions.length > 0 ||
-          updated.campaigns.length > 0,
+          updated.campaigns.length > 0 ||
+          updated.exchangeRate != null,
       );
+    }
+  };
+  const resolvePdfPassword = (password) => {
+    const resolve = pdfPasswordResolver.current;
+    pdfPasswordResolver.current = null;
+    setPdfPasswordRequest(null);
+    resolve?.(password);
+  };
+  const pickBackup = async () => {
+    if (busyRef.current || !vaultReady) return;
+    if (!globalThis.cardpulseDesktop) {
+      backupInputRef.current?.click();
+      return;
+    }
+    busyRef.current = true;
+    setVaultBusy(true);
+    try {
+      const payload = await globalThis.cardpulseDesktop.importBackup();
+      if (payload) {
+        setPendingBackup(payload);
+        openPassword('restore');
+      }
+    } catch (error) {
+      setNotice([{ text: error.message }]);
+    } finally {
+      busyRef.current = false;
+      setVaultBusy(false);
+    }
+  };
+  const readBackupFile = async (file) => {
+    if (!file || busyRef.current || !vaultReady) return;
+    busyRef.current = true;
+    setVaultBusy(true);
+    try {
+      if (file.size > MAX_BACKUP_BYTES + 1024)
+        throw new Error('备份文件过大或格式无效');
+      setPendingBackup(parseBackup(await file.text()));
+      openPassword('restore');
+    } catch (error) {
+      setNotice([{ text: error.message }]);
+    } finally {
+      busyRef.current = false;
+      setVaultBusy(false);
+      if (backupInputRef.current) backupInputRef.current.value = '';
+    }
+  };
+  const applyRate = (value) => {
+    if (unavailable || isDemo || busyRef.current) return;
+    if (
+      !/^\d+(?:\.\d{1,8})?$/.test(value) ||
+      !(Number(value) > 0) ||
+      Number(value) > 10000
+    ) {
+      setNotice([{ text: '汇率格式无效' }]);
+      return;
+    }
+    setWorkspace((prev) => ({
+      ...prev,
+      exchangeRate: {
+        rate: Number(value),
+        date: getHongKongDate(),
+        source: 'manual',
+      },
+    }));
+    setDirty(true);
+  };
+  const refreshRate = async () => {
+    if (unavailable || isDemo || busyRef.current) return;
+    busyRef.current = true;
+    setRateBusy(true);
+    try {
+      const info = await fetchHkdCnyRate({
+        signal: AbortSignal.timeout(10000),
+      });
+      if (!(info.rate > 0) || !isIsoDate(info.date))
+        throw new Error('汇率暂不可用');
+      setWorkspace((prev) => ({ ...prev, exchangeRate: info }));
+      setDirty(true);
+    } catch {
+      setNotice([{ text: '汇率暂不可用' }]);
+    } finally {
+      busyRef.current = false;
+      setRateBusy(false);
     }
   };
 
@@ -330,7 +469,12 @@ export default function App() {
           </div>
           <div>
             <div className="brand-title">
-              CardPulse<span className="brand-version">LOCAL / PRIVATE</span>
+              CardPulse
+              <span className="brand-version">
+                {globalThis.cardpulseDesktop
+                  ? 'DESKTOP / PRIVATE'
+                  : 'LOCAL / PRIVATE'}
+              </span>
             </div>
             <p className="brand-subtitle">{t('本地信用卡工作区')}</p>
           </div>
@@ -373,10 +517,38 @@ export default function App() {
           <h1>{t('整理交易，核对结单，管理每一份奖赏。')}</h1>
         </div>
         <div className="header-actions">
+          <input
+            ref={backupInputRef}
+            type="file"
+            hidden
+            accept=".cardpulse"
+            aria-label={t('选择加密备份')}
+            onChange={(e) => readBackupFile(e.target.files?.[0])}
+          />
+          <button
+            className="btn btn-secondary"
+            disabled={loadingFile || vaultBusy || rateBusy || !vaultReady}
+            onClick={pickBackup}
+          >
+            <FolderOpen size={14} />
+            {t('恢复加密备份')}
+          </button>
+          {!vaultLocked &&
+            !isDemo &&
+            (transactions.length > 0 || campaigns.length > 0 || hasVault) && (
+              <button
+                className="btn btn-secondary"
+                disabled={unavailable}
+                onClick={() => openPassword('backup')}
+              >
+                <Archive size={14} />
+                {t('导出加密备份')}
+              </button>
+            )}
           {hasVault && (
             <button
               className="btn btn-secondary"
-              disabled={loadingFile || vaultBusy}
+              disabled={loadingFile || vaultBusy || rateBusy}
               onClick={() =>
                 vaultLocked ? openPassword('unlock') : handleLock()
               }
@@ -388,10 +560,13 @@ export default function App() {
           {!vaultLocked &&
             vaultReady &&
             !isDemo &&
-            (hasVault || transactions.length > 0 || campaigns.length > 0) && (
+            (hasVault ||
+              transactions.length > 0 ||
+              campaigns.length > 0 ||
+              workspace.exchangeRate) && (
               <button
                 className="btn btn-primary"
-                disabled={loadingFile || vaultBusy}
+                disabled={loadingFile || vaultBusy || rateBusy}
                 onClick={() => openPassword('save')}
               >
                 <ShieldCheck size={14} />
@@ -401,7 +576,7 @@ export default function App() {
             )}
           <button
             className="btn btn-secondary"
-            disabled={loadingFile || vaultBusy}
+            disabled={loadingFile || vaultBusy || rateBusy}
             onClick={() => setIsDemo((prev) => !prev)}
           >
             <Eye size={14} />
@@ -424,7 +599,8 @@ export default function App() {
           )}
           {(hasVault ||
             activeTransactions.length > 0 ||
-            campaigns.length > 0) && (
+            campaigns.length > 0 ||
+            workspace.exchangeRate) && (
             <button
               className="btn btn-ghost"
               disabled={unavailable}
@@ -458,6 +634,14 @@ export default function App() {
           ))}
         </div>
       </div>
+      <DataSettings
+        rateInfo={rateInfo}
+        disabled={unavailable || isDemo}
+        rateBusy={rateBusy}
+        onApplyRate={applyRate}
+        onFetchRate={refreshRate}
+        t={t}
+      />
       <BankWorkspace
         selected={activeBank}
         onSelect={setActiveBank}
@@ -864,9 +1048,13 @@ export default function App() {
             <div className="modal-header">
               <h2 id="vault-title">
                 {t(
-                  passwordMode === 'unlock'
-                    ? '解锁本地加密库'
-                    : '保存到本地加密库',
+                  passwordMode === 'backup'
+                    ? '导出加密备份'
+                    : passwordMode === 'restore'
+                      ? '恢复加密备份'
+                      : passwordMode === 'unlock'
+                        ? '解锁本地加密库'
+                        : '保存到本地加密库',
                 )}
               </h2>
               <button
@@ -881,9 +1069,11 @@ export default function App() {
             </div>
             <p className="muted small">
               {t(
-                passwordMode === 'unlock' || hasVault
-                  ? '请输入现有主密码，数据仅在本地加解密。'
-                  : '请设置主密码。忘记密码后无法找回，请妥善保管。',
+                passwordMode === 'restore'
+                  ? '请输入备份文件的密码，验证成功后才会替换本地数据。'
+                  : passwordMode === 'unlock' || hasVault
+                    ? '请输入现有主密码，数据仅在本地加解密。'
+                    : '请设置主密码。忘记密码后无法找回，请妥善保管。',
               )}
             </p>
             <label className="field">
@@ -923,14 +1113,26 @@ export default function App() {
                 {t(
                   vaultBusy
                     ? '处理中…'
-                    : passwordMode === 'unlock'
-                      ? '解锁数据'
-                      : '加密保存',
+                    : passwordMode === 'restore'
+                      ? '确认恢复'
+                      : passwordMode === 'backup'
+                        ? '导出加密备份'
+                        : passwordMode === 'unlock'
+                          ? '解锁数据'
+                          : '加密保存',
                 )}
               </button>
             </div>
           </form>
         </div>
+      )}
+      {pdfPasswordRequest && (
+        <PdfPasswordDialog
+          key={`${pdfPasswordRequest.fileName}-${pdfPasswordRequest.error}`}
+          request={pdfPasswordRequest}
+          onResolve={resolvePdfPassword}
+          t={t}
+        />
       )}
     </div>
   );
