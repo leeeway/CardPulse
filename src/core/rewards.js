@@ -75,7 +75,7 @@ export function calculateRewards(transactions, { today = getHongKongDate(), hkdC
     if (!tx.day || tx.day < startOfYear || tx.day > today) continue;
     if (tx.category === 'repayment' || tx.category === 'fee') continue;
     // The dashboard currently implements Pulse only. Never apply its rates to Red.
-    if ((tx.ruleId && tx.ruleId !== 'hsbc_pulse') || !['CNY', 'HKD'].includes(tx.currency)) {
+    if ((tx.bankId && tx.bankId !== 'hsbc') || (tx.ruleId && tx.ruleId !== 'hsbc_pulse') || !['CNY', 'HKD'].includes(tx.currency)) {
       pendingCount++;
       continue;
     }

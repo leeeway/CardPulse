@@ -19,3 +19,12 @@ it('同内容改名后导入不会重复计账，同名不同内容保留不同�
   assert.equal(merged.statements[0].transactionCount, 1);
   assert.equal(statement.transactions[0].id, 'old');
 });
+
+it('标准 CSV 按银行及卡片隔离指纹，避免把不同银行的相同明细当成重复', async () => {
+  const file = new File(['same normalized rows'], 'transactions.csv');
+  const renamed = new File(['same normalized rows'], 'renamed.csv');
+  const boc = { bankId: 'bochk', cardId: 'bochk_custom' };
+  const hsbc = { bankId: 'hsbc', cardId: 'hsbc_pulse' };
+  assert.equal(await fingerprintFile(file, boc), await fingerprintFile(renamed, boc));
+  assert.notEqual(await fingerprintFile(file, boc), await fingerprintFile(file, hsbc));
+});

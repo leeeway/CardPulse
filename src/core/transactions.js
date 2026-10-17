@@ -1,3 +1,5 @@
+import { bankOf } from './banks.js';
+
 /**
  * 交易列表过滤、统计与安全 CSV 导出工具
  */
@@ -26,11 +28,13 @@ export function filterTransactions(transactions, filters) {
 /**
  * 安全导出 CSV，对 = + - @ 符号进行转义防止 Excel 公式执行漏洞 (Formula Injection)
  */
-export function exportToSafeCsv(transactions) {
+export function exportToSafeCsv(transactions, translate = text => text) {
   const headers = [
     '交易日期',
     '记账日期',
     '卡号末四位',
+    '银行',
+    '卡片',
     '币种',
     '收支方向',
     '金额',
@@ -54,8 +58,10 @@ export function exportToSafeCsv(transactions) {
     escapeCell(tx.transactionDay || tx.day),
     escapeCell(tx.day),
     escapeCell(tx.last4 || ''),
+    escapeCell(bankOf(tx)),
+    escapeCell(tx.ruleId || 'hsbc_pulse'),
     escapeCell(tx.currency),
-    escapeCell(tx.direction === 'credit' ? '入账/还款' : '支出'),
+    escapeCell(translate(tx.direction === 'credit' ? '入账/还款' : '支出')),
     escapeCell(tx.amount),
     escapeCell(tx.category || 'spend'),
     escapeCell(tx.description),
@@ -63,6 +69,6 @@ export function exportToSafeCsv(transactions) {
     escapeCell(tx.sources?.map(s => s.fileName).join(';') || '')
   ]);
 
-  const csvContent = '\uFEFF' + [headers.map(escapeCell).join(','), ...rows.map(r => r.join(','))].join('\r\n');
+  const csvContent = '\uFEFF' + [headers.map(header => escapeCell(translate(header))).join(','), ...rows.map(r => r.join(','))].join('\r\n');
   return csvContent;
 }

@@ -34,3 +34,14 @@ it('请求成功后事务中止仍然报告失败，并保留之前的密文', a
   assert.deepEqual(await loadFromVault('password'), { version: 1 });
   await clearVault();
 });
+
+it('新版保险库保存活动配置，读取时能兼容旧版交易库', async () => {
+  const { normalizeWorkspace, emptyWorkspace } = await import('../src/core/workspace.js');
+  const campaign = { id: 'activity', name: 'Saved campaign', bankId: 'bochk', currency: 'HKD', startDate: '2026-01-01', endDate: '2026-12-31', ratePercent: '2.5', period: 'monthly', dateBasis: 'posting', channel: 'any', registrationConfirmed: true };
+  const workspace = { ...emptyWorkspace(), campaigns: [campaign] };
+  await saveToVault(workspace, 'password');
+  assert.equal(normalizeWorkspace(await loadFromVault('password')).campaigns[0].name, campaign.name);
+  await saveToVault({ transactions: [] }, 'password');
+  assert.deepEqual(normalizeWorkspace(await loadFromVault('password')), emptyWorkspace());
+  await clearVault();
+});

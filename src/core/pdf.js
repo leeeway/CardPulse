@@ -12,7 +12,7 @@ GlobalWorkerOptions.workerSrc = workerUrl;
 export const MAX_FILE_BYTES = 25 * 1024 * 1024;
 export const MAX_PAGES = 200;
 
-export async function parsePdfStatement(file, { password, onProgress = () => {}, signal } = {}) {
+export async function parsePdfStatement(file, { password, onProgress = () => {}, signal, cardId } = {}) {
   signal?.throwIfAborted();
   if (file.size > MAX_FILE_BYTES) throw new Error('文件超过 25 MB 限制');
   const data = new Uint8Array(await file.arrayBuffer());
@@ -61,7 +61,7 @@ export async function parsePdfStatement(file, { password, onProgress = () => {},
       page.cleanup();
     }
 
-    return extractStatementData(pages, file.name);
+    return extractStatementData(pages, file.name, { cardId });
   } catch (err) {
     if (err.name === 'PasswordException') {
       const pErr = new Error(err.code === PasswordResponses.INCORRECT_PASSWORD ? '结单密码错误' : 'PDF 已加密，请输入密码');

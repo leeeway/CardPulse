@@ -73,3 +73,12 @@ describe('坐标解析与结单对账', () => {
     assert.equal(groupTextLines([item('B', 100, 11), item('A', 1, 10)])[0].text, 'A B');
   });
 });
+
+it('银行身份只从结单表头识别，商户名不会改变卡种', () => {
+  const fixture = page({ extra: 'HSBC PULSE', rows: [['02 JAN', '02 JAN', 'CITIBANK SHOP', '50.00']] });
+  assert.equal(extractStatementData([fixture], 'boc.pdf').ruleId, 'hsbc_pulse');
+  const foreign = page({ extra: 'BOCHK', rows: [['02 JAN', '02 JAN', 'SHOP', '50.00']] });
+  assert.throws(() => extractStatementData([foreign], 'pulse.pdf', { cardId: 'hsbc_pulse' }), /PDF 版式尚未适配/);
+  const red = page({ extra: 'HSBC RED CARD', rows: [['02 JAN', '02 JAN', 'SHOP', '50.00']] });
+  assert.throws(() => extractStatementData([red], 'red.pdf', { cardId: 'hsbc_pulse' }), /选择不同/);
+});

@@ -1,5 +1,5 @@
 import { parseMoney, verifyBalance } from './reconciliation.js';
-import { matchCardRule } from './rules/registry.js';
+import { matchCardRule, CARD_RULES } from './rules/registry.js';
 
 const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
 const MONTH_PATTERN = MONTHS.join('|');
@@ -42,13 +42,26 @@ function inferDate(text, statementDate) {
   return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === dayStr ? dayStr : null;
 }
 
-export function extractStatementData(pages, fileName) {
+export function extractStatementData(pages, fileName, { cardId } = {}) {
   const transactions = [];
   const warnings = [];
   let statementDate = '';
   const currencies = new Set();
-  const allText = pages.flatMap(page => groupTextLines(page.items).map(line => line.text)).join('\n');
-  const rule = matchCardRule(allText + '\n' + fileName);
+  const pageLines = pages.map(page => groupTextLines(page.items));
+  const allText = pageLines.flatMap(lines => lines.map(line => line.text)).join('\n');
+  // Bank identity must come from the statement heading, never merchant descriptions.
+  const identityText = pageLines.flatMap(lines => {
+    const header = lines.find(line => /post\s*date/i.test(line.text) && /trans\s*date/i.test(line.text));
+    return header ? lines.filter(line => line.y < header.y).map(line => line.text) : [];
+  }).join('\n');
+  const headingRule = matchCardRule(identityText);
+  const fileRule = matchCardRule(fileName);
+  const detected = headingRule.bankId === 'other' || (headingRule.id.endsWith('_custom') && headingRule.bankId === fileRule.bankId)
+    ? fileRule : headingRule;
+  if (!['hsbc', 'other'].includes(detected.bankId)) throw new Error('此银行的 PDF 版式尚未适配，请使用标准 CSV 导入');
+  const selected = CARD_RULES[cardId];
+  if (selected && detected.bankId === 'hsbc' && !detected.id.endsWith('_custom') && selected.id !== detected.id) throw new Error('检测到的卡片与导入选择不同，请检查卡片类型');
+  const rule = detected.id.endsWith('_custom') && selected?.bankId === 'hsbc' ? selected : detected;
   const balances = {};
   const fullDate = allText.match(new RegExp(`(?:STATEMENT DATE|结单日期|結單日期)\\s*:?\\s*(\\d{1,2})\\s*(${MONTH_PATTERN})\\s*(20\\d{2})`, 'i')) || allText.match(FULL_DATE);
   if (fullDate) statementDate = `${fullDate[3]}-${String(MONTHS.indexOf(fullDate[2].toUpperCase()) + 1).padStart(2, '0')}-${String(fullDate[1]).padStart(2, '0')}`;
@@ -123,6 +136,7 @@ export function extractStatementData(pages, fileName) {
         direction: money.direction,
         currency: pageCurrency,
         ruleId: rule.id,
+        bankId: rule.bankId,
         last4,
         category: money.direction === 'credit' ? (/PAYMENT|还款|還款/i.test(descText) ? 'repayment' : 'credit')
           : /\b(?:FEE|INTEREST|FINANCE CHARGE)\b|手续费|手續費|利息/i.test(descText) ? 'fee' : 'spend',
@@ -150,6 +164,7 @@ export function extractStatementData(pages, fileName) {
     currencies: [...currencies],
     transactions,
     ruleId: rule.id,
+    bankId: rule.bankId,
     reconciliation,
     warnings
   };
