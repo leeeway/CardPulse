@@ -1,0 +1,41 @@
+appId: io.cardpulse.desktop
+productName: CardPulse
+copyright: Copyright © 2026 CardPulse contributors
+asar: true
+npmRebuild: false
+directories:
+  output: release
+  buildResources: build
+files:
+  - dist/**/*
+  - desktop/**/*
+  - build/icon.png
+  - '!node_modules/**/*'
+  - package.json
+  - LICENSE
+artifactName: CardPulse-${version}-${os}-${arch}.${ext}
+mac:
+  category: public.app-category.finance
+  icon: build/icon.icns
+  identity: '-'
+  target:
+    - dmg
+    - zip
+  hardenedRuntime: true
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.plist
+  minimumSystemVersion: '13.0'
+win:
+  icon: build/icon.ico
+  signExecutable: false
+  target:
+    - nsis
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  deleteAppDataOnUninstall: false
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: CardPulse
+publish: null

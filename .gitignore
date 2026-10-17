@@ -40,3 +40,7 @@ tests/fixtures/real/
 # Browser regression test output
 playwright-report/
 test-results/
+
+# Desktop packages and local encrypted data
+release/
+*.cardpulse
