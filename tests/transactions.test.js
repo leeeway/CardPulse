@@ -53,7 +53,7 @@ describe('交易工具与安全 CSV 导出', () => {
 
     const csv = exportToSafeCsv(dangerousTxs);
     // 必须转义单引号防范 Excel 自动执行公式
-    assert.ok(csv.includes("'\=cmd") || csv.includes("''=cmd") || csv.includes("`=cmd") || csv.includes("=cmd"));
+    assert.ok(csv.includes('"\'=cmd|""/C calc""!A0"'));
     assert.ok(csv.includes("'+100.00"));
     assert.ok(csv.includes("'@malicious"));
   });

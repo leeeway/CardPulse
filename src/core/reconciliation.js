@@ -11,9 +11,16 @@ const MONEY_REGEX = /^(-?)(\d{1,3}(?:,\d{3})+|\d+)\.(\d{2})\s*(CR|DR)?$/i;
  * @returns {bigint} 12345n
  */
 export function cents(amount) {
-  if (typeof amount !== 'string') amount = String(amount);
-  const [whole, fraction = ''] = amount.replaceAll(',', '').split('.');
-  return BigInt(whole) * 100n + BigInt(fraction.padEnd(2, '0').slice(0, 2));
+  return decimalUnits(amount, 2);
+}
+
+// Reject malformed amounts instead of silently truncating financial data.
+export function decimalUnits(amount, precision) {
+  const match = String(amount).trim().match(/^(-?)(\d{1,3}(?:,\d{3})+|\d+)(?:\.(\d+))?$/);
+  if (!match || (match[3]?.length || 0) > precision) throw new Error('金额格式无效');
+  const units = BigInt(match[2].replaceAll(',', '')) * 10n ** BigInt(precision)
+    + BigInt((match[3] || '').padEnd(precision, '0'));
+  return match[1] ? -units : units;
 }
 
 /**

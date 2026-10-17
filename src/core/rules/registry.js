@@ -14,6 +14,7 @@ export const CARD_RULES = {
  */
 export function matchCardRule(text = '', currencies = []) {
   const upper = text.toUpperCase();
+  if (/\bRED\s*CARD\b/.test(upper)) return HSBC_RED_RULE;
   if (currencies.includes('CNY') && currencies.includes('HKD')) {
     return HSBC_PULSE_RULE;
   }

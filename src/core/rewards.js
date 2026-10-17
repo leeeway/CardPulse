@@ -3,6 +3,8 @@
  * 采用 BigInt 放大 100,000 倍（十万分之一元）消除浮点误差
  */
 
+import { decimalUnits } from './reconciliation.js';
+
 export const SCALE = 100000n;
 export const ANNUAL_CAP = 100000n * SCALE;
 export const PULSE_HALF_YEAR_CAP = 80000n * SCALE;
@@ -13,15 +15,14 @@ const minBigInt = (a, b) => (a < b ? a : b);
 
 export function toScaledBigInt(amountStr) {
   if (!amountStr) return 0n;
-  const [whole, fraction = ''] = String(amountStr).split('.');
-  return BigInt(whole) * SCALE + BigInt(fraction.padEnd(5, '0').slice(0, 5));
+  return decimalUnits(amountStr, 5);
 }
 
 export function fromScaledBigInt(scaled) {
-  const roundedCents = (nonnegative(scaled) + 500n) / 1000n;
+  const roundedCents = ((scaled < 0n ? -scaled : scaled) + 500n) / 1000n;
   const whole = roundedCents / 100n;
   const fraction = String(roundedCents % 100n).padStart(2, '0');
-  return `${whole}.${fraction}`;
+  return `${scaled < 0n && roundedCents > 0n ? '-' : ''}${whole}.${fraction}`;
 }
 
 export function getHongKongDate(date = new Date()) {
@@ -73,6 +74,11 @@ export function calculateRewards(transactions, { today = getHongKongDate(), hkdC
   for (const tx of transactions) {
     if (!tx.day || tx.day < startOfYear || tx.day > today) continue;
     if (tx.category === 'repayment' || tx.category === 'fee') continue;
+    // The dashboard currently implements Pulse only. Never apply its rates to Red.
+    if ((tx.ruleId && tx.ruleId !== 'hsbc_pulse') || !['CNY', 'HKD'].includes(tx.currency)) {
+      pendingCount++;
+      continue;
+    }
 
     const amount = toScaledBigInt(tx.amount);
     const isCredit = tx.direction === 'credit';
@@ -80,6 +86,7 @@ export function calculateRewards(transactions, { today = getHongKongDate(), hkdC
     const channelKey = override.channel || tx.channel?.key || 'standard';
 
     if (channelKey === 'exclude') continue;
+    if (tx.channel?.uncertain && !override.channel) pendingCount++;
 
     includedCount++;
 

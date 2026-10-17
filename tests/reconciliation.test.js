@@ -49,3 +49,13 @@ describe('会计精度与对账模块', () => {
     assert.equal(result.difference, '-500.00');
   });
 });
+
+it('负数小数金额精确转换，不接受金额尾部垃圾或超出分的精度', () => {
+  assert.equal(cents('-0.50'), -50n);
+  assert.equal(cents('-12.34'), -1234n);
+  assert.equal(cents('-1,234.56'), -123456n);
+  assert.throws(() => cents('1.234'));
+  assert.throws(() => cents('1,23.45'));
+  assert.throws(() => cents('10.00 CR'));
+  assert.equal(verifyBalance('-0.50', '-0.25', [{ amount: '0.25', direction: 'debit' }]).status, 'matched');
+});
