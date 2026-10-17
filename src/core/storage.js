@@ -1,97 +1,59 @@
-/**
- * IndexedDB 本地加密持久化模块
- * 结合 Web Crypto 对结单与交易明细进行端侧透明加解密
- */
-
+/** Encrypted workspace storage. Writes succeed only after the transaction commits. */
 import { encryptData, decryptData } from './crypto.js';
 
-const DB_NAME = 'CardPulse_DB';
-const DB_VERSION = 1;
 const STORE_NAME = 'vault';
 
 function openDatabase() {
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
-    request.onupgradeneeded = event => {
-      const db = event.target.result;
-      if (!db.objectStoreNames.contains(STORE_NAME)) {
-        db.createObjectStore(STORE_NAME, { keyPath: 'id' });
-      }
+    const request = indexedDB.open('CardPulse_DB', 1);
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      if (!db.objectStoreNames.contains(STORE_NAME)) db.createObjectStore(STORE_NAME, { keyPath: 'id' });
     };
-    request.onsuccess = () => resolve(request.result);
+    request.onsuccess = () => {
+      request.result.onversionchange = () => request.result.close();
+      resolve(request.result);
+    };
     request.onerror = () => reject(request.error);
+    request.onblocked = () => reject(new Error('本地库被其他页面占用，请关闭其他 CardPulse 页面后重试'));
   });
 }
 
-/**
- * 检查本地存储是否存在已加密的保险库
- */
-export async function hasEncryptedVault() {
+async function accessVault(mode, operation) {
+  const db = await openDatabase();
   try {
-    const db = await openDatabase();
-    return new Promise((resolve) => {
-      const tx = db.transaction(STORE_NAME, 'readonly');
-      const store = tx.objectStore(STORE_NAME);
-      const req = store.get('vault_payload');
-      req.onsuccess = () => resolve(Boolean(req.result));
-      req.onerror = () => resolve(false);
+    return await new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, mode);
+      const request = operation(tx.objectStore(STORE_NAME));
+      tx.oncomplete = () => resolve(request.result);
+      tx.onabort = () => reject(tx.error || new Error('本地存储事务已中止'));
+      tx.onerror = () => reject(tx.error || new Error('本地存储失败'));
     });
-  } catch {
-    return false;
+  } finally {
+    db.close();
   }
 }
 
-/**
- * 将全部工作区状态（结单列表、手动调整、配置）加密写入 IndexedDB
- */
+export async function hasEncryptedVault() {
+  // A storage failure must never be interpreted as an empty vault.
+  return Boolean(await accessVault('readonly', store => store.get('vault_payload')));
+}
+
 export async function saveToVault(data, password) {
-  const db = await openDatabase();
-  const encryptedPayload = await encryptData(data, password);
-
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, 'readwrite');
-    const store = tx.objectStore(STORE_NAME);
-    const req = store.put({ id: 'vault_payload', payload: encryptedPayload, updatedAt: Date.now() });
-    req.onsuccess = () => resolve(true);
-    req.onerror = () => reject(req.error);
-  });
+  const payload = await encryptData(data, password);
+  await accessVault('readwrite', store => store.put({ id: 'vault_payload', payload, updatedAt: Date.now() }));
 }
 
-/**
- * 从 IndexedDB 读取并解密工作区数据
- */
 export async function loadFromVault(password) {
-  const db = await openDatabase();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, 'readonly');
-    const store = tx.objectStore(STORE_NAME);
-    const req = store.get('vault_payload');
-    req.onsuccess = async () => {
-      if (!req.result) {
-        resolve(null);
-        return;
-      }
-      try {
-        const decrypted = await decryptData(req.result.payload, password);
-        resolve(decrypted);
-      } catch (err) {
-        reject(new Error('密码不正确或数据已损坏'));
-      }
-    };
-    req.onerror = () => reject(req.error);
-  });
+  const record = await accessVault('readonly', store => store.get('vault_payload'));
+  if (!record) return null;
+  try {
+    return await decryptData(record.payload, password);
+  } catch {
+    throw new Error('密码不正确或数据已损坏');
+  }
 }
 
-/**
- * 清空本地存储
- */
 export async function clearVault() {
-  const db = await openDatabase();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, 'readwrite');
-    const store = tx.objectStore(STORE_NAME);
-    const req = store.clear();
-    req.onsuccess = () => resolve(true);
-    req.onerror = () => reject(req.error);
-  });
+  await accessVault('readwrite', store => store.clear());
 }

@@ -259,6 +259,7 @@ body {
 
 table {
   width: 100%;
+  min-width: 760px;
   border-collapse: collapse;
   text-align: left;
   font-size: 13px;
@@ -346,4 +347,24 @@ tr:hover td {
 .modal-title {
   font-size: 18px;
   font-weight: 600;
+}
+
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.workspace-status, .statement-status {
+  margin-bottom: 20px;
+  padding: 14px 18px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.statement-status { color: var(--text-muted); }
+.statement-status > div + div { margin-top: 12px; }
+.dropzone[aria-disabled="true"] { opacity: 0.5; cursor: not-allowed; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+@media (max-width: 800px) {
+  .header { align-items: flex-start; flex-direction: column; gap: 16px; }
+  .header-actions { flex-wrap: wrap; }
+  .progress-desc { flex-wrap: wrap; gap: 4px; }
 }

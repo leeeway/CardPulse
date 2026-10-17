@@ -16,7 +16,7 @@ export async function fetchHkdCnyRate({ signal } = {}) {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     const rate = Number(data.rates?.CNY || data.rate);
-    if (!rate || !Number.isFinite(rate)) {
+    if (!(rate > 0) || !Number.isFinite(rate)) {
       throw new Error('返回的汇率无效');
     }
     return {
@@ -25,10 +25,10 @@ export async function fetchHkdCnyRate({ signal } = {}) {
       source: 'Frankfurter'
     };
   } catch (err) {
-    // 离线或无外网时的合理 fallback
+    if (signal?.aborted) throw err;
     return {
-      rate: 0.93, // 近期基准参考值
-      date: '参考基准',
+      rate: null,
+      date: '汇率暂不可用',
       isFallback: true
     };
   }
