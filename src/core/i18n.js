@@ -1,5 +1,7 @@
 // UI text is translated explicitly; transaction descriptions and user activity names stay untouched.
 export const traditional = {
+  '本地库版本不受支持，请使用兼容版本的应用':
+    '不支援此本機資料庫版本，請使用相容版本的應用程式',
   离线与汇率: '離線與匯率',
   '账单、活动和密码仅在本地处理。默认不联网，参考汇率可手动填写。':
     '結單、活動和密碼僅在本機處理。預設不連線，參考匯率可手動填寫。',

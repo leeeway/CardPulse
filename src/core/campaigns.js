@@ -20,8 +20,24 @@ export function isIsoDate(value) {
   );
 }
 export function validateCampaign(value) {
-  if (!value.name?.trim() || value.name.length > 80)
+  if (
+    !value ||
+    typeof value !== 'object' ||
+    Array.isArray(value) ||
+    typeof value.name !== 'string' ||
+    !value.name.trim() ||
+    value.name.length > 80
+  )
     throw new Error('请输入活动名称（最多 80 字）');
+  if (
+    ['ratePercent', 'spendingCap', 'rewardCap', 'minSpend'].some(
+      (key) =>
+        value[key] != null && !['string', 'number'].includes(typeof value[key]),
+    ) ||
+    (value.registrationConfirmed != null &&
+      typeof value.registrationConfirmed !== 'boolean')
+  )
+    throw new Error('本地库不存在或格式无效');
   if (!getBank(value.bankId)) throw new Error('请选择银行');
   if (value.cardId && !cardsFor(value.bankId).includes(value.cardId))
     throw new Error('请选择银行及卡片');
@@ -39,7 +55,11 @@ export function validateCampaign(value) {
     throw new Error('请选择有效的计算周期');
   if (!CHANNELS.includes(value.channel))
     throw new Error('请选择有效的支付渠道');
-  if (value.last4 && !/^\d{4}$/.test(value.last4))
+  if (
+    value.last4 != null &&
+    (typeof value.last4 !== 'string' ||
+      (value.last4 !== '' && !/^\d{4}$/.test(value.last4)))
+  )
     throw new Error('卡号末四位须为 4 位数字');
   const rate = cents(value.ratePercent);
   if (rate <= 0n || rate > 10000n)
@@ -48,7 +68,11 @@ export function validateCampaign(value) {
     if (value[field] !== '' && value[field] != null && cents(value[field]) < 0n)
       throw new Error('额度和门槛不能为负数');
   }
-  if ((value.merchant || '').length > 120) throw new Error('商户关键词过长');
+  if (
+    value.merchant != null &&
+    (typeof value.merchant !== 'string' || value.merchant.length > 120)
+  )
+    throw new Error('商户关键词过长');
   return {
     ...value,
     name: value.name.trim(),
