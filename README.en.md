@@ -178,13 +178,16 @@ Node.js 24.12+ is recommended. Build tools need a network connection to download
 
 ## Planned work
 
-These features are not implemented and are outside the current support scope:
+These features are not implemented and are outside the current support scope. Suggested order:
 
-- Expand redacted statement fixtures and improve layout compatibility.
-- Verify official campaign rules, add native statement adapters, and model points, tiered rates, and statement cycles.
-- Add local OCR for scanned statements.
-- Support Beancount / Ledger export.
-- Add a spending strategy simulator.
+1. **Transaction review**: edit categories and payment channels with a change history; remove mistakenly imported statements and recalculate rewards.
+2. **Explainable calculations**: show matching rules, exclusions, refund clawbacks, thresholds, and allowance usage per transaction for comparison with bank postings.
+3. **Campaign models**: add tiers, points, and statement cycles; define stacking and exclusions, and link refunds across periods.
+4. **More native bank PDFs**: collect redacted fixtures and reconciliation tests before adding each adapter; retain standard CSV as the common import route.
+5. **Desktop experience**: idle locking, password changes, and backup reminders; complete native Windows verification and release signing.
+6. **Further extensions**: local OCR, Beancount / Ledger export, and spending strategy simulation.
+
+Local vaults and encrypted backups validate data versions, record IDs, and key nested fields. Unsupported versions and damaged content are rejected before they can cause errors after restoration.
 
 ## License and disclaimer
 
