@@ -20,19 +20,19 @@ It is designed for people who want to organize several months of statements whil
 
 ## Desktop downloads and installation
 
-Download the `v0.2.0-beta.1` desktop preview from [GitHub Releases](https://github.com/leeeway/CardPulse/releases). End users do not need Node.js, a development server, an account, or a business backend.
+Download the `v0.2.0-beta.2` desktop preview from [GitHub Releases](https://github.com/leeeway/CardPulse/releases). End users do not need Node.js, a development server, an account, or a business backend.
 
 | System | Download | Installation |
 | --- | --- | --- |
-| macOS 13+ · Apple silicon | `CardPulse-0.2.0-beta.1-mac-arm64.dmg` | Open the DMG and drag CardPulse to Applications |
-| macOS 13+ · Intel | `CardPulse-0.2.0-beta.1-mac-x64.dmg` | Open the DMG and drag CardPulse to Applications |
-| Windows 10 / 11 · x64 | `CardPulse-0.2.0-beta.1-win-x64.exe` | Run the per-user installation wizard and choose a destination |
+| macOS 13+ · Apple silicon | `CardPulse-0.2.0-beta.2-mac-arm64.dmg` | Open the DMG and drag CardPulse to Applications |
+| macOS 13+ · Intel | `CardPulse-0.2.0-beta.2-mac-x64.dmg` | Open the DMG and drag CardPulse to Applications |
+| Windows 10 / 11 · x64 | `CardPulse-0.2.0-beta.2-win-x64.exe` | Run the per-user installation wizard and choose a destination |
 
 ZIP archives are also provided for Mac. Mac packages use ad-hoc signing without Apple Developer ID signing or notarization; Windows packages have no Authenticode publisher signature. Your OS may block the first launch. After checking the source and SHA-256, decide whether to use macOS System Settings → Privacy & Security → Open Anyway, or the Windows SmartScreen prompts. Do not disable system-wide security protections.
 
-The release includes `SHA256SUMS.txt`. Place it alongside downloaded packages. On macOS, run `shasum -a 256 -c SHA256SUMS.txt`; entries for packages you did not download report missing files and can be ignored. On Windows PowerShell, compare `Get-FileHash .\CardPulse-0.2.0-beta.1-win-x64.exe -Algorithm SHA256` with the manifest.
+The release includes `SHA256SUMS.txt`. Place it alongside downloaded packages. On macOS, run `shasum -a 256 -c SHA256SUMS.txt`; entries for packages you did not download report missing files and can be ignored. On Windows PowerShell, compare `Get-FileHash .\CardPulse-0.2.0-beta.2-win-x64.exe -Algorithm SHA256` with the manifest.
 
-This is the first desktop beta. Packaged Mac apps undergo startup, parsing, and persistence tests. The Windows installer is cross-built on macOS and has not undergone native Windows runtime acceptance testing. Report issues through Issues. Export an encrypted backup before uninstalling.
+This is a desktop beta. Packaged Mac apps undergo startup, parsing, and persistence tests. The Windows installer is cross-built on macOS and has not undergone native Windows runtime acceptance testing. Report issues through Issues. Export an encrypted backup before uninstalling.
 
 Desktop records are stored in the current OS user profile: `~/Library/Application Support/CardPulse/vault.cardpulse` on macOS, or `%APPDATA%/CardPulse/vault.cardpulse` on Windows. Updates reuse this directory; installers contain no personal statements. The Windows uninstaller does not actively delete application data, but manual system cleanup may remove it.
 
@@ -67,7 +67,7 @@ Open the local address printed in your terminal, usually `http://localhost:5173`
 
 ### Transaction review and statement management
 
-These features are available in the current source and are not included in the published `v0.2.0-beta.1` installers.
+These features are included starting with `v0.2.0-beta.2`.
 
 - Click **Review transaction** (核对交易 / 核對交易) on a transaction row to correct its category or payment channel. Debits can be spending or fees; credits can be refunds or repayments. Rewards recalculate immediately. The review dialog shows change history while retaining the original amount, dates, and source evidence.
 - Choose **Exclude from rewards** (不计奖赏 / 不計獎賞) to exclude a transaction from built-in and custom campaign estimates. Selecting a channel does not confirm campaign registration. The reading-oriented CSV export includes the current channel; full change history is retained in the encrypted vault and backups.

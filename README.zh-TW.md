@@ -20,19 +20,19 @@ CardPulse 是一個在本機處理資料的信用卡 PDF 結單分析工具。�
 
 ## 桌面版下載與安裝
 
-從 [GitHub Releases](https://github.com/leeeway/CardPulse/releases) 下載 `v0.2.0-beta.1` 桌面預覽版。安裝後即可使用，毋須 Node.js、瀏覽器服務、帳戶或業務伺服器。
+從 [GitHub Releases](https://github.com/leeeway/CardPulse/releases) 下載 `v0.2.0-beta.2` 桌面預覽版。安裝後即可使用，毋須 Node.js、瀏覽器服務、帳戶或業務伺服器。
 
 | 系統 | 下載檔案 | 安裝方式 |
 | --- | --- | --- |
-| macOS 13+ · Apple 晶片 | `CardPulse-0.2.0-beta.1-mac-arm64.dmg` | 開啟 DMG，將 CardPulse 拖至「應用程式」 |
-| macOS 13+ · Intel | `CardPulse-0.2.0-beta.1-mac-x64.dmg` | 開啟 DMG，將 CardPulse 拖至「應用程式」 |
-| Windows 10 / 11 · x64 | `CardPulse-0.2.0-beta.1-win-x64.exe` | 執行安裝精靈，可為目前使用者選擇安裝目錄 |
+| macOS 13+ · Apple 晶片 | `CardPulse-0.2.0-beta.2-mac-arm64.dmg` | 開啟 DMG，將 CardPulse 拖至「應用程式」 |
+| macOS 13+ · Intel | `CardPulse-0.2.0-beta.2-mac-x64.dmg` | 開啟 DMG，將 CardPulse 拖至「應用程式」 |
+| Windows 10 / 11 · x64 | `CardPulse-0.2.0-beta.2-win-x64.exe` | 執行安裝精靈，可為目前使用者選擇安裝目錄 |
 
 Mac 亦提供 ZIP。此預覽版的 Mac 套件只有本機 ad-hoc 簽署，未使用 Apple Developer ID 簽署或公證；Windows 套件沒有 Authenticode 發行者簽署。系統可能攔截首次啟動。確認來源及 SHA-256 後，可依 macOS「系統設定 → 私隱與保安 → 仍要開啟」或 Windows SmartScreen 提示自行決定是否執行。請勿關閉系統全域安全保護。
 
-Release 提供 `SHA256SUMS.txt`。將其與下載套件放在同一目錄，在 macOS 可執行 `shasum -a 256 -c SHA256SUMS.txt` 校驗已下載檔案；未下載的檔案會報告缺失，可忽略其缺失提示。在 Windows PowerShell 可執行 `Get-FileHash .\CardPulse-0.2.0-beta.1-win-x64.exe -Algorithm SHA256` 並與清單比對。
+Release 提供 `SHA256SUMS.txt`。將其與下載套件放在同一目錄，在 macOS 可執行 `shasum -a 256 -c SHA256SUMS.txt` 校驗已下載檔案；未下載的檔案會報告缺失，可忽略其缺失提示。在 Windows PowerShell 可執行 `Get-FileHash .\CardPulse-0.2.0-beta.2-win-x64.exe -Algorithm SHA256` 並與清單比對。
 
-這是首個桌面測試版。Mac 打包應用程式會進行啟動、解析及持久化測試；Windows 安裝套件由 macOS 交叉建置，尚未經原生 Windows 執行驗收。問題可透過 Issues 回報。解除安裝前建議先匯出加密備份。
+這是桌面測試版。Mac 打包應用程式會進行啟動、解析及持久化測試；Windows 安裝套件由 macOS 交叉建置，尚未經原生 Windows 執行驗收。問題可透過 Issues 回報。解除安裝前建議先匯出加密備份。
 
 桌面資料儲存在目前系統使用者的應用程式資料目錄：macOS 為 `~/Library/Application Support/CardPulse/vault.cardpulse`，Windows 為 `%APPDATA%/CardPulse/vault.cardpulse`。更新沿用此目錄，安裝套件不包含個人結單。解除安裝程式不主動刪除 Windows 資料目錄；手動清理系統資料仍可能刪除保險庫。
 
@@ -67,7 +67,7 @@ npm run dev
 
 ### 交易核對與結單管理
 
-以下功能已加入目前源碼，尚未包含在已發佈的 `v0.2.0-beta.1` 安裝套件中。
+以下功能自 `v0.2.0-beta.2` 起提供。
 
 - 在交易列點擊 **「核對交易」**，修正分類或支付渠道。支出可設為消費、費用；入帳可設為退款、還款。獎賞立即重新計算，修改前後記錄可於核對視窗查看，原始金額、日期及來源維持不變。
 - 選擇 **「不計獎賞」** 可將該筆記錄從內置及自訂活動估算中排除。選擇渠道不會自動確認活動登記資格。查閱用 CSV 匯出包含目前渠道，但完整修改記錄僅儲存在加密資料庫及加密備份中。

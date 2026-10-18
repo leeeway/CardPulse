@@ -20,19 +20,19 @@ CardPulse 是一个本地处理的信用卡 PDF 账单分析工具。导入受�
 
 ## 桌面版下载与安装
 
-从 [GitHub Releases](https://github.com/leeeway/CardPulse/releases) 下载 `v0.2.0-beta.1` 桌面预览版。安装后即可使用，无需 Node.js、浏览器服务、账号或业务服务器。
+从 [GitHub Releases](https://github.com/leeeway/CardPulse/releases) 下载 `v0.2.0-beta.2` 桌面预览版。安装后即可使用，无需 Node.js、浏览器服务、账号或业务服务器。
 
 | 系统 | 下载文件 | 安装方式 |
 | --- | --- | --- |
-| macOS 13+ · Apple 芯片 | `CardPulse-0.2.0-beta.1-mac-arm64.dmg` | 打开 DMG，将 CardPulse 拖到“应用程序” |
-| macOS 13+ · Intel | `CardPulse-0.2.0-beta.1-mac-x64.dmg` | 打开 DMG，将 CardPulse 拖到“应用程序” |
-| Windows 10 / 11 · x64 | `CardPulse-0.2.0-beta.1-win-x64.exe` | 运行安装向导，可为当前用户选择安装目录 |
+| macOS 13+ · Apple 芯片 | `CardPulse-0.2.0-beta.2-mac-arm64.dmg` | 打开 DMG，将 CardPulse 拖到“应用程序” |
+| macOS 13+ · Intel | `CardPulse-0.2.0-beta.2-mac-x64.dmg` | 打开 DMG，将 CardPulse 拖到“应用程序” |
+| Windows 10 / 11 · x64 | `CardPulse-0.2.0-beta.2-win-x64.exe` | 运行安装向导，可为当前用户选择安装目录 |
 
 Mac 同时提供 ZIP 包。此预览版的 Mac 包仅有本地 ad-hoc 签名，未使用 Apple Developer ID 签名或公证；Windows 包没有 Authenticode 发布者签名。系统可能拦截首次启动。确认来源及 SHA-256 后，可按 macOS“系统设置 → 隐私与安全性 → 仍要打开”或 Windows SmartScreen 的提示自行决定是否运行。请勿关闭系统全局安全保护。
 
-Release 提供 `SHA256SUMS.txt`。将其与下载包放在同一目录，在 macOS 可运行 `shasum -a 256 -c SHA256SUMS.txt` 校验已下载文件；未下载的文件会报告缺失，可忽略其缺失提示。在 Windows PowerShell 可运行 `Get-FileHash .\CardPulse-0.2.0-beta.1-win-x64.exe -Algorithm SHA256` 并与清单比对。
+Release 提供 `SHA256SUMS.txt`。将其与下载包放在同一目录，在 macOS 可运行 `shasum -a 256 -c SHA256SUMS.txt` 校验已下载文件；未下载的文件会报告缺失，可忽略其缺失提示。在 Windows PowerShell 可运行 `Get-FileHash .\CardPulse-0.2.0-beta.2-win-x64.exe -Algorithm SHA256` 并与清单比对。
 
-这是首个桌面测试版。Mac 打包应用会进行启动、解析与持久化测试；Windows 安装包由 macOS 交叉构建，尚未经过原生 Windows 运行验收。问题可通过 Issues 反馈。卸载前建议先导出加密备份。
+这是桌面测试版。Mac 打包应用会进行启动、解析与持久化测试；Windows 安装包由 macOS 交叉构建，尚未经过原生 Windows 运行验收。问题可通过 Issues 反馈。卸载前建议先导出加密备份。
 
 桌面数据保存在当前系统用户的应用数据目录：macOS 为 `~/Library/Application Support/CardPulse/vault.cardpulse`，Windows 为 `%APPDATA%/CardPulse/vault.cardpulse`。应用更新沿用此目录，安装包不包含个人账单。卸载程序不主动删除 Windows 数据目录；手动清理系统数据仍可能删除保险库。
 
@@ -67,7 +67,7 @@ npm run dev
 
 ### 交易核对与结单管理
 
-以下功能已加入当前源码，尚未包含在已发布的 `v0.2.0-beta.1` 安装包中。
+以下功能自 `v0.2.0-beta.2` 起提供。
 
 - 在交易行点击 **“核对交易”**，修正分类或支付渠道。消费支出可设为消费、费用；入账可设为退款、还款。奖赏立即重新计算，修改前后记录可在核对窗口查看，原始金额、日期和来源保持不变。
 - 选择 **“不计奖赏”** 可将该笔记录从内置及自定义活动估算中排除。选择渠道不会自动确认活动登记资格。查阅用 CSV 导出包含当前渠道，但完整修改记录仅保存在加密库和加密备份中。
