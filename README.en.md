@@ -65,6 +65,15 @@ Open the local address printed in your terminal, usually `http://localhost:5173`
 4. **Save your records**: Select **“保存到加密库”** (Save to encrypted vault). Set a master password on the first save, then use the existing password for updates. **Importing does not automatically save your records.**
 5. **Restore or export**: Unlock the local vault when you return. CSV exports contain only the currently filtered transactions.
 
+### Transaction review and statement management
+
+These features are available in the current source and are not included in the published `v0.2.0-beta.1` installers.
+
+- Click **Review transaction** (核对交易 / 核對交易) on a transaction row to correct its category or payment channel. Debits can be spending or fees; credits can be refunds or repayments. Rewards recalculate immediately. The review dialog shows change history while retaining the original amount, dates, and source evidence.
+- Choose **Exclude from rewards** (不计奖赏 / 不計獎賞) to exclude a transaction from built-in and custom campaign estimates. Selecting a channel does not confirm campaign registration. The reading-oriented CSV export includes the current channel; full change history is retained in the encrypted vault and backups.
+- Expand the statement and reconciliation section to delete a selected statement and its linked transactions. Other statements, campaigns, and exchange rates remain. The original file can be imported again after deletion; manual corrections belonging to the deleted transactions are removed too.
+- Corrections and deletions persist only after **Save to encrypted vault**. Source files remain untouched. Reconciliation still describes the imported balance check and does not confirm payment channels or campaign eligibility.
+
 Reconciliation statuses:
 
 | Status | Meaning | Suggested action |
@@ -180,12 +189,11 @@ Node.js 24.12+ is recommended. Build tools need a network connection to download
 
 These features are not implemented and are outside the current support scope. Suggested order:
 
-1. **Transaction review**: edit categories and payment channels with a change history; remove mistakenly imported statements and recalculate rewards.
-2. **Explainable calculations**: show matching rules, exclusions, refund clawbacks, thresholds, and allowance usage per transaction for comparison with bank postings.
-3. **Campaign models**: add tiers, points, and statement cycles; define stacking and exclusions, and link refunds across periods.
-4. **More native bank PDFs**: collect redacted fixtures and reconciliation tests before adding each adapter; retain standard CSV as the common import route.
-5. **Desktop experience**: idle locking, password changes, and backup reminders; complete native Windows verification and release signing.
-6. **Further extensions**: local OCR, Beancount / Ledger export, and spending strategy simulation.
+1. **Explainable calculations**: show matching rules, exclusions, refund clawbacks, thresholds, and allowance usage per transaction for comparison with bank postings.
+2. **Campaign models**: add tiers, points, and statement cycles; define stacking and exclusions, and link refunds across periods.
+3. **More native bank PDFs**: collect redacted fixtures and reconciliation tests before adding each adapter; retain standard CSV as the common import route.
+4. **Desktop experience**: idle locking, password changes, and backup reminders; complete native Windows verification and release signing.
+5. **Further extensions**: local OCR, Beancount / Ledger export, and spending strategy simulation.
 
 Local vaults and encrypted backups validate data versions, record IDs, and key nested fields. Unsupported versions and damaged content are rejected before they can cause errors after restoration.
 
