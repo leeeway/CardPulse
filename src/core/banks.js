@@ -73,4 +73,5 @@ export const bankOf = (tx) =>
 export const cardsFor = (bankId) =>
   getBank(bankId)?.cards || [`${bankId}_custom`];
 export const cardName = (id) =>
-  ({ hsbc_pulse: 'HSBC Pulse', hsbc_red: 'HSBC Red' })[id] || '自定义卡片';
+  ({ __proto__: null, hsbc_pulse: 'HSBC Pulse', hsbc_red: 'HSBC Red' })[id] ||
+  '自定义卡片';

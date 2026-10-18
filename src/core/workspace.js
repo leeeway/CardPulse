@@ -19,6 +19,30 @@ const uniqueIds = (items) =>
     (item) => record(item) && typeof item.id === 'string' && item.id.trim(),
   ) && new Set(items.map((item) => item.id)).size === items.length;
 
+const validChannel = (value) =>
+  value == null ||
+  (record(value) &&
+    typeof value.key === 'string' &&
+    optionalString(value.label) &&
+    ['pulse', 'uncertain'].every(
+      (key) => value[key] == null || typeof value[key] === 'boolean',
+    ));
+const validSnapshot = (value) =>
+  record(value) &&
+  optionalString(value.category) &&
+  validChannel(value.channel);
+const validHistory = (value) =>
+  value == null ||
+  (Array.isArray(value) &&
+    value.every(
+      (change) =>
+        record(change) &&
+        typeof change.at === 'string' &&
+        Number.isFinite(Date.parse(change.at)) &&
+        validSnapshot(change.before) &&
+        validSnapshot(change.after),
+    ));
+
 export function normalizeWorkspace(data) {
   if (
     !record(data) ||
@@ -47,14 +71,9 @@ export function normalizeWorkspace(data) {
         (tx.transactionDay != null &&
           tx.transactionDay !== '' &&
           !isIsoDate(tx.transactionDay)) ||
-        (tx.channel != null &&
-          (!record(tx.channel) ||
-            typeof tx.channel.key !== 'string' ||
-            !optionalString(tx.channel.label) ||
-            ['pulse', 'uncertain'].some(
-              (key) =>
-                tx.channel[key] != null && typeof tx.channel[key] !== 'boolean',
-            ))) ||
+        !optionalString(tx.statementId) ||
+        !validChannel(tx.channel) ||
+        !validHistory(tx.reviewHistory) ||
         (tx.sources != null &&
           (!Array.isArray(tx.sources) ||
             tx.sources.some(

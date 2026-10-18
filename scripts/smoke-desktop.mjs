@@ -44,13 +44,11 @@ try {
   await page.waitForFunction(
     () => !document.querySelector('[type=file][accept=".pdf,.csv"]').disabled,
   );
-  await page
-    .locator('input[accept=".pdf,.csv"]')
-    .setInputFiles({
-      name: 'native-statement.pdf',
-      mimeType: 'application/pdf',
-      buffer: makeEncryptedStatementPdf(),
-    });
+  await page.locator('input[accept=".pdf,.csv"]').setInputFiles({
+    name: 'native-statement.pdf',
+    mimeType: 'application/pdf',
+    buffer: makeEncryptedStatementPdf(),
+  });
   await page.locator('input[type="password"]').fill('wrong password');
   await page.getByRole('button', { name: '继续解析', exact: true }).click();
   await page.getByText('结单密码错误', { exact: true }).waitFor();
@@ -58,6 +56,13 @@ try {
   await page.getByRole('button', { name: '继续解析', exact: true }).click();
   await page.getByText('已导入 1 笔交易', { exact: false }).waitFor();
   assert.equal(await page.locator('tbody tr').count(), 1);
+  await page.getByRole('button', { name: '核对交易', exact: true }).click();
+  await page
+    .getByRole('dialog')
+    .getByLabel('支付渠道', { exact: true })
+    .selectOption('applePay');
+  await page.getByRole('button', { name: '应用修正', exact: true }).click();
+  assert.match(await page.locator('tbody tr').innerText(), /已人工修正/);
   await page
     .getByLabel('参考汇率（1 HKD = CNY）', { exact: true })
     .fill('0.93');
@@ -122,6 +127,17 @@ try {
   await page.getByRole('button', { name: '确认恢复', exact: true }).click();
   await page.getByText('已恢复加密备份', { exact: false }).waitFor();
   assert.equal(await page.locator('tbody tr').count(), 1);
+  await page.getByRole('button', { name: '核对交易', exact: true }).click();
+  assert.equal(
+    await page
+      .getByRole('dialog')
+      .getByLabel('支付渠道', { exact: true })
+      .inputValue(),
+    'applePay',
+  );
+  await page.locator('.review-history summary').click();
+  assert.match(await page.getByRole('dialog').innerText(), /待确认渠道/);
+  await page.getByRole('button', { name: '取消', exact: true }).click();
   await page.screenshot({
     path: join(screenshots, 'desktop-smoke.png'),
     fullPage: true,
@@ -139,8 +155,29 @@ try {
     .fill('native vault password');
   await page.getByRole('button', { name: '解锁数据', exact: true }).click();
   await page.locator('tbody tr').first().waitFor();
+  await page.evaluate(() => {
+    window.confirm = () => true;
+  });
+  await page.getByText('查看结单与对账', { exact: false }).click();
+  await page.getByRole('button', { name: '删除结单', exact: true }).click();
+  assert.equal(await page.locator('tbody tr').count(), 0);
+  await page.getByRole('button', { name: '保存到加密库', exact: true }).click();
+  await page
+    .getByLabel('主密码', { exact: true })
+    .fill('native vault password');
+  await page.getByRole('button', { name: '加密保存', exact: true }).click();
+  await page.getByRole('dialog').waitFor({ state: 'hidden' });
+  await page.reload();
+  await page.getByRole('button', { name: '解锁本地库', exact: true }).click();
+  await page
+    .getByLabel('主密码', { exact: true })
+    .fill('native vault password');
+  await page.getByRole('button', { name: '解锁数据', exact: true }).click();
+  await page.getByRole('dialog').waitFor({ state: 'hidden' });
+  assert.equal(await page.locator('tbody tr').count(), 0);
+  assert.equal(await page.locator('.statement-row').count(), 0);
   console.log(
-    'PASS: Electron secure origin, isolated renderer, packaged PDF worker, offline startup/import, encrypted PDF password retry, native encrypted file, manual FX persistence, backup/export/restore, reload and full application restart.',
+    'PASS: Electron secure origin, isolated renderer, packaged PDF worker, offline startup/import, encrypted PDF password retry, native encrypted file, manual FX persistence, backup/export/restore, transaction review history, statement deletion, reload and full application restart.',
   );
 } finally {
   if (application) await application.close();

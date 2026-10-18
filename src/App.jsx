@@ -20,7 +20,14 @@ import {
 } from './core/rewards.js';
 import { filterTransactions, exportToSafeCsv } from './core/transactions.js';
 import { fetchHkdCnyRate } from './core/exchange.js';
-import { fingerprintFile, mergeStatement } from './core/imports.js';
+import {
+  fingerprintFile,
+  mergeStatement,
+  belongsToStatement,
+  removeStatement,
+} from './core/imports.js';
+import { reviewTransaction, categoryText } from './core/review.js';
+import TransactionReviewDialog from './components/TransactionReviewDialog.jsx';
 import {
   saveToVault,
   loadFromVault,
@@ -90,6 +97,7 @@ export default function App() {
   const [pendingBackup, setPendingBackup] = useState(null);
   const [pdfPasswordRequest, setPdfPasswordRequest] = useState(null);
   const [filters, setFilters] = useState(emptyFilters);
+  const [reviewId, setReviewId] = useState(null);
   const [vaultLocked, setVaultLocked] = useState(false);
   const [hasVault, setHasVault] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
@@ -151,6 +159,7 @@ export default function App() {
     () => calculateRewards(bankTransactions, { hkdCnyRate: rateInfo.rate }),
     [bankTransactions, rateInfo.rate],
   );
+  const reviewTarget = transactions.find((tx) => tx.id === reviewId);
   const showPulse = activeBank === 'all' || activeBank === 'hsbc';
 
   const openPassword = (mode) => {
@@ -168,6 +177,7 @@ export default function App() {
     }
   };
   const clearMemory = () => {
+    setReviewId(null);
     setWorkspace(emptyWorkspace());
     setFilters(emptyFilters());
     setActiveBank('all');
@@ -363,6 +373,39 @@ export default function App() {
       busyRef.current = false;
       setVaultBusy(false);
     }
+  };
+  const applyReview = (patch) => {
+    if (unavailable || isDemo || busyRef.current || !reviewTarget) return;
+    try {
+      const updated = reviewTransaction(workspace, reviewId, patch);
+      if (updated !== workspace) {
+        setWorkspace(normalizeWorkspace(updated));
+        setDirty(true);
+        setNotice([{ text: '交易已修正，奖赏已重新计算；请保存到加密库。' }]);
+      }
+      setReviewId(null);
+    } catch (error) {
+      setNotice([{ text: error.message }]);
+    }
+  };
+  const deleteStatement = (statement) => {
+    if (unavailable || isDemo || busyRef.current) return;
+    const count = transactions.filter((tx) =>
+      belongsToStatement(tx, statement.id),
+    ).length;
+    if (
+      !confirm(
+        t(
+          '删除结单「{file}」及其 {count} 笔交易？奖赏将重新计算。删除后需保存到加密库。',
+          { file: statement.fileName || statement.id, count },
+        ),
+      )
+    )
+      return;
+    setWorkspace(removeStatement(workspace, statement.id));
+    setReviewId(null);
+    setDirty(true);
+    setNotice([{ text: '结单及关联交易已删除，请保存到加密库。' }]);
   };
   const mutateCampaigns = (next) => {
     if (!unavailable && !isDemo) {
@@ -858,6 +901,15 @@ export default function App() {
                   {statement.warnings?.map((warning, index) => (
                     <p key={index}>{t(warning)}</p>
                   ))}
+                  <button
+                    type="button"
+                    className="btn btn-ghost"
+                    disabled={unavailable}
+                    onClick={() => deleteStatement(statement)}
+                  >
+                    <Trash2 size={14} />
+                    {t('删除结单')}
+                  </button>
                 </div>
               ))}
           </div>
@@ -952,6 +1004,7 @@ export default function App() {
                     '渠道',
                     '币种',
                     '金额',
+                    '操作',
                   ].map((label) => (
                     <th key={label}>{t(label)}</th>
                   ))}
@@ -978,6 +1031,16 @@ export default function App() {
                     </td>
                     <td>
                       <strong>{tx.description}</strong>
+                      <small>
+                        {t(
+                          categoryText(
+                            tx.category ||
+                              (tx.direction === 'credit' ? 'credit' : 'spend'),
+                          ),
+                        )}
+                        {tx.reviewHistory?.length > 0 &&
+                          ` · ${t('已人工修正')}`}
+                      </small>
                       {tx.notes?.length > 0 && (
                         <small>{tx.notes.join(' · ')}</small>
                       )}
@@ -999,6 +1062,16 @@ export default function App() {
                     >
                       {tx.direction === 'credit' ? '−' : '+'}
                       {tx.amount}
+                    </td>
+                    <td>
+                      <button
+                        type="button"
+                        className="btn btn-ghost"
+                        disabled={unavailable || isDemo}
+                        onClick={() => setReviewId(tx.id)}
+                      >
+                        {t('核对交易')}
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -1125,6 +1198,16 @@ export default function App() {
             </div>
           </form>
         </div>
+      )}
+      {reviewTarget && !isDemo && !unavailable && (
+        <TransactionReviewDialog
+          key={reviewTarget.id}
+          transaction={reviewTarget}
+          onSave={applyReview}
+          onClose={() => setReviewId(null)}
+          t={t}
+          locale={preferences.locale}
+        />
       )}
       {pdfPasswordRequest && (
         <PdfPasswordDialog

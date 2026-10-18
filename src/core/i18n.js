@@ -1,5 +1,25 @@
 // UI text is translated explicitly; transaction descriptions and user activity names stay untouched.
 export const traditional = {
+  核对交易: '核對交易',
+  应用修正: '套用修正',
+  修改记录: '修改記錄',
+  已人工修正: '已人工修正',
+  操作: '操作',
+  支付渠道: '支付渠道',
+  删除结单: '刪除結單',
+  交易记录不存在: '交易記錄不存在',
+  修改时间无效: '修改時間無效',
+  '仅修改分类与渠道，原始金额、日期和来源保持不变。修改记录随加密库保存。':
+    '僅修改分類與渠道，原始金額、日期和來源維持不變。修改記錄隨加密資料庫儲存。',
+  '请依据原始结单确认。选择渠道不会自动确认活动登记资格。':
+    '請依原始結單確認。選擇渠道不會自動確認活動登記資格。',
+  '交易已修正，奖赏已重新计算；请保存到加密库。':
+    '交易已修正，獎賞已重新計算；請儲存至加密資料庫。',
+  '删除结单「{file}」及其 {count} 笔交易？奖赏将重新计算。删除后需保存到加密库。':
+    '刪除結單「{file}」及其 {count} 筆交易？獎賞將重新計算。刪除後須儲存至加密資料庫。',
+  '结单及关联交易已删除，请保存到加密库。':
+    '結單及關聯交易已刪除，請儲存至加密資料庫。',
+
   '本地库版本不受支持，请使用兼容版本的应用':
     '不支援此本機資料庫版本，請使用相容版本的應用程式',
   离线与汇率: '離線與匯率',
@@ -266,8 +286,9 @@ export const traditional = {
 };
 
 export function translate(locale, text, values = {}) {
-  let result = locale === 'zh-TW' ? traditional[text] || text : text;
-  if (locale === 'zh-TW' && !traditional[text]) {
+  const hasTranslation = Object.hasOwn(traditional, text);
+  let result = locale === 'zh-TW' && hasTranslation ? traditional[text] : text;
+  if (locale === 'zh-TW' && !hasTranslation) {
     const csvError = text.match(/^CSV 第 (\d+) 行：(.*)$/s);
     if (csvError)
       result = `CSV 第 ${csvError[1]} 行：${translate(locale, csvError[2])}`;
@@ -285,6 +306,7 @@ export function translate(locale, text, values = {}) {
 }
 export const channelText = (key) =>
   ({
+    __proto__: null,
     standard: '普通支付',
     applePay: 'Apple Pay',
     unionpayQr: '银联二维码',

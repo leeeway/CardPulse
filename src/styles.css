@@ -910,3 +910,29 @@ footer a {
 .data-settings > p + p {
   margin-top: 6px;
 }
+
+.review-dialog {
+  margin: auto;
+  width: calc(100% - 32px);
+  color: var(--text-main);
+}
+.review-dialog::backdrop {
+  background: #0009;
+}
+.review-description,
+.review-history {
+  overflow-wrap: anywhere;
+}
+.review-history {
+  margin-top: 18px;
+  font-size: 12px;
+}
+.review-history ol {
+  padding-left: 20px;
+}
+.review-history li {
+  margin-top: 10px;
+}
+.review-history time {
+  color: var(--text-muted);
+}

@@ -1,14 +1,22 @@
 import { bankOf } from './banks.js';
+import { channelText } from './i18n.js';
 
 /**
  * 交易列表过滤、统计与安全 CSV 导出工具
  */
 
 export function filterTransactions(transactions, filters) {
-  const { search = '', direction = 'all', currency = 'all', from = '', to = '', category = 'all' } = filters;
+  const {
+    search = '',
+    direction = 'all',
+    currency = 'all',
+    from = '',
+    to = '',
+    category = 'all',
+  } = filters;
   const query = search.trim().toLowerCase();
 
-  return transactions.filter(tx => {
+  return transactions.filter((tx) => {
     if (currency !== 'all' && tx.currency !== currency) return false;
     if (direction !== 'all' && tx.direction !== direction) return false;
     if (category !== 'all' && tx.category !== category) return false;
@@ -16,7 +24,7 @@ export function filterTransactions(transactions, filters) {
     if (to && tx.day > to) return false;
     if (query) {
       const matchDesc = tx.description?.toLowerCase().includes(query);
-      const matchNote = tx.notes?.some(n => n.toLowerCase().includes(query));
+      const matchNote = tx.notes?.some((n) => n.toLowerCase().includes(query));
       const matchAmount = tx.amount?.includes(query);
       const matchCard = tx.last4?.includes(query);
       if (!matchDesc && !matchNote && !matchAmount && !matchCard) return false;
@@ -28,7 +36,7 @@ export function filterTransactions(transactions, filters) {
 /**
  * 安全导出 CSV，对 = + - @ 符号进行转义防止 Excel 公式执行漏洞 (Formula Injection)
  */
-export function exportToSafeCsv(transactions, translate = text => text) {
+export function exportToSafeCsv(transactions, translate = (text) => text) {
   const headers = [
     '交易日期',
     '记账日期',
@@ -40,11 +48,12 @@ export function exportToSafeCsv(transactions, translate = text => text) {
     '金额',
     '分类',
     '商户与描述',
+    '支付渠道',
     '渠道与备注',
-    '结单文件名'
+    '结单文件名',
   ];
 
-  const escapeCell = value => {
+  const escapeCell = (value) => {
     if (value === null || value === undefined) return '""';
     let str = String(value).trim();
     // 防范 CSV Formula Injection
@@ -54,7 +63,7 @@ export function exportToSafeCsv(transactions, translate = text => text) {
     return `"${str.replaceAll('"', '""')}"`;
   };
 
-  const rows = transactions.map(tx => [
+  const rows = transactions.map((tx) => [
     escapeCell(tx.transactionDay || tx.day),
     escapeCell(tx.day),
     escapeCell(tx.last4 || ''),
@@ -65,10 +74,20 @@ export function exportToSafeCsv(transactions, translate = text => text) {
     escapeCell(tx.amount),
     escapeCell(tx.category || 'spend'),
     escapeCell(tx.description),
+    escapeCell(
+      translate(
+        tx.channel?.uncertain ? '待确认渠道' : channelText(tx.channel?.key),
+      ),
+    ),
     escapeCell(tx.notes?.join('; ') || ''),
-    escapeCell(tx.sources?.map(s => s.fileName).join(';') || '')
+    escapeCell(tx.sources?.map((s) => s.fileName).join(';') || ''),
   ]);
 
-  const csvContent = '\uFEFF' + [headers.map(header => escapeCell(translate(header))).join(','), ...rows.map(r => r.join(','))].join('\r\n');
+  const csvContent =
+    '\uFEFF' +
+    [
+      headers.map((header) => escapeCell(translate(header))).join(','),
+      ...rows.map((r) => r.join(',')),
+    ].join('\r\n');
   return csvContent;
 }
