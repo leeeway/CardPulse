@@ -20,17 +20,17 @@ It is designed for people who want to organize several months of statements whil
 
 ## Desktop downloads and installation
 
-Download the `v0.2.0-beta.2` desktop preview from [GitHub Releases](https://github.com/leeeway/CardPulse/releases). End users do not need Node.js, a development server, an account, or a business backend.
+Download the `v0.2.0-beta.3` desktop preview from [GitHub Releases](https://github.com/leeeway/CardPulse/releases). End users do not need Node.js, a development server, an account, or a business backend.
 
 | System | Download | Installation |
 | --- | --- | --- |
-| macOS 13+ · Apple silicon | `CardPulse-0.2.0-beta.2-mac-arm64.dmg` | Open the DMG and drag CardPulse to Applications |
-| macOS 13+ · Intel | `CardPulse-0.2.0-beta.2-mac-x64.dmg` | Open the DMG and drag CardPulse to Applications |
-| Windows 10 / 11 · x64 | `CardPulse-0.2.0-beta.2-win-x64.exe` | Run the per-user installation wizard and choose a destination |
+| macOS 13+ · Apple silicon | `CardPulse-0.2.0-beta.3-mac-arm64.dmg` | Open the DMG and drag CardPulse to Applications |
+| macOS 13+ · Intel | `CardPulse-0.2.0-beta.3-mac-x64.dmg` | Open the DMG and drag CardPulse to Applications |
+| Windows 10 / 11 · x64 | `CardPulse-0.2.0-beta.3-win-x64.exe` | Run the per-user installation wizard and choose a destination |
 
 ZIP archives are also provided for Mac. Mac packages use ad-hoc signing without Apple Developer ID signing or notarization; Windows packages have no Authenticode publisher signature. Your OS may block the first launch. After checking the source and SHA-256, decide whether to use macOS System Settings → Privacy & Security → Open Anyway, or the Windows SmartScreen prompts. Do not disable system-wide security protections.
 
-The release includes `SHA256SUMS.txt`. Place it alongside downloaded packages. On macOS, run `shasum -a 256 -c SHA256SUMS.txt`; entries for packages you did not download report missing files and can be ignored. On Windows PowerShell, compare `Get-FileHash .\CardPulse-0.2.0-beta.2-win-x64.exe -Algorithm SHA256` with the manifest.
+The release includes `SHA256SUMS.txt`. Place it alongside downloaded packages. On macOS, run `shasum -a 256 -c SHA256SUMS.txt`; entries for packages you did not download report missing files and can be ignored. On Windows PowerShell, compare `Get-FileHash .\CardPulse-0.2.0-beta.3-win-x64.exe -Algorithm SHA256` with the manifest.
 
 This is a desktop beta. Packaged Mac apps undergo startup, parsing, and persistence tests. The Windows installer is cross-built on macOS and has not undergone native Windows runtime acceptance testing. Report issues through Issues. Export an encrypted backup before uninstalling.
 
@@ -65,20 +65,22 @@ Open the local address printed in your terminal, usually `http://localhost:5173`
 4. **Save your records**: Select **“保存到加密库”** (Save to encrypted vault). Set a master password on the first save, then use the existing password for updates. **Importing does not automatically save your records.**
 5. **Restore or export**: Unlock the local vault when you return. CSV exports contain only the currently filtered transactions.
 
-The current source also supports inclusive **posting-date ranges** and resetting all transaction filters. Date filters affect only the table and CSV export, without changing reward calculations. A reversed range shows an error and disables export. This feature is not included in the `v0.2.0-beta.2` installers.
+Filter by inclusive **posting-date ranges**, or reset all transaction filters. Date filters affect only the table and CSV export, without changing reward calculations. A reversed range shows an error and disables export. This feature is included starting with `v0.2.0-beta.3`.
 
 ### Transaction review and statement management
 
-These features are included starting with `v0.2.0-beta.2`.
+Transaction corrections and statement deletion are included starting with `v0.2.0-beta.2`.
 
 - Click **Review transaction** (核对交易 / 核對交易) on a transaction row to correct its category or payment channel. Debits can be spending or fees; credits can be refunds or repayments. Rewards recalculate immediately. The review dialog shows change history while retaining the original amount, dates, and source evidence.
 - Choose **Exclude from rewards** (不计奖赏 / 不計獎賞) to exclude a transaction from built-in and custom campaign estimates. Selecting a channel does not confirm campaign registration. The reading-oriented CSV export includes the current channel; full change history is retained in the encrypted vault and backups.
 - Expand the statement and reconciliation section to delete a selected statement and its linked transactions. Other statements, campaigns, and exchange rates remain. The original file can be imported again after deletion; manual corrections belonging to the deleted transactions are removed too.
 - Corrections and deletions persist only after **Save to encrypted vault**. Source files remain untouched. Reconciliation still describes the imported balance check and does not confirm payment channels or campaign eligibility.
 
-Maintenance improvements in the current source:
+Maintenance improvements in `v0.2.0-beta.3`:
 
 - Clearing data or successfully restoring a backup discards unsaved campaign editor drafts; canceled or failed restores keep the current draft. A workspace containing only a manual exchange rate can also be exported as an encrypted backup.
+
+**Pulse explanations:** Expand the calculation details for CNY/HKD base rewards, annual bonus rewards, both half-year allowances, and annual refund clawbacks. Transaction explanations show inclusion, exclusions, and uncertain channels. The current model combines the two capped half-year reward pools before applying matching annual refunds, without tracing the original purchase. Affected CNY conversions remain unknown without an exchange rate. Available from `v0.2.0-beta.3`; users must still verify current bank terms and eligibility.
 
 Reconciliation statuses:
 
@@ -134,7 +136,7 @@ Select Add campaign and configure the bank, card or last four digits, currency, 
 - Each campaign calculates one currency. Percentage rates accept up to two decimal places. Calculations use fixed-point integers, with displayed rewards rounded to cents.
 - Campaign estimates are independent. The app does not add them together or decide whether they stack with other campaigns or Pulse rewards. Search filters only affect the transaction table and CSV export, not campaign matching.
 
-**Calculation explanations (current source):** Expand the period estimate to inspect gross spending, refunds, net spending, thresholds, spending caps, remaining allowances, rewards before/after capping, and applied refund clawbacks. Expand transaction explanations to see inclusion or the first exclusion reason, filter included/excluded records, and page through 25 records at a time. Explanations share the calculation's matching logic. Caps remain period aggregates rather than per-transaction rewards. Uncertain channels retain a warning; displayed rounding can cause small component differences. Explanations are derived in memory without changing the encrypted workspace schema. These features are not included in the `v0.2.0-beta.2` installers.
+**Custom campaign explanations:** Expand the period estimate to inspect gross spending, refunds, net spending, thresholds, spending caps, remaining allowances, rewards before/after capping, and applied refund clawbacks. Expand transaction explanations to see inclusion or the first exclusion reason, filter included/excluded records, and page through 25 records at a time. Explanations share the calculation's matching logic. Caps remain period aggregates rather than per-transaction rewards. Uncertain channels retain a warning; displayed rounding can cause small component differences. Explanations are derived in memory without changing the encrypted workspace schema. These features are included starting with `v0.2.0-beta.3`.
 
 **Extension assessment:** Flat rates, caps, calendar periods, and thresholds fit a shared configuration model and are implemented. Points/miles conversion, tiered rates, statement cycles, cross-period refund matching, shared principal/supplementary allowances, and stacking need dedicated models. Native bank PDFs also need layout fixtures and reconciliation checks. For example, the [official Standard Chartered Smart page](https://www.sc.com/hk/credit-cards/smart/) describes statement-cycle spending, which cannot be replaced with calendar months. Bank links provide official references for manual checking, not verified reward presets.
 
@@ -197,11 +199,10 @@ Node.js 24.12+ is recommended. Build tools need a network connection to download
 
 These features are not implemented and are outside the current support scope. Suggested order:
 
-1. **Pulse explanations**: extend the custom campaign explanations to cover built-in matching rules, annual/half-year allowances, and refund clawbacks.
-2. **Campaign models**: add tiers, points, and statement cycles; define stacking and exclusions, and link refunds across periods.
-3. **More native bank PDFs**: collect redacted fixtures and reconciliation tests before adding each adapter; retain standard CSV as the common import route.
-4. **Desktop experience**: idle locking, password changes, and backup reminders; complete native Windows verification and release signing.
-5. **Further extensions**: local OCR, Beancount / Ledger export, and spending strategy simulation.
+1. **Campaign models**: add tiers, points, and statement cycles; define stacking and exclusions, and link refunds across periods.
+2. **More native bank PDFs**: collect redacted fixtures and reconciliation tests before adding each adapter; retain standard CSV as the common import route.
+3. **Desktop experience**: idle locking, password changes, and backup reminders; complete native Windows verification and release signing.
+4. **Further extensions**: local OCR, Beancount / Ledger export, and spending strategy simulation.
 
 Local vaults and encrypted backups validate data versions, record IDs, and key nested fields. Unsupported versions and damaged content are rejected before they can cause errors after restoration.
 
