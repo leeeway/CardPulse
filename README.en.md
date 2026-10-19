@@ -65,6 +65,8 @@ Open the local address printed in your terminal, usually `http://localhost:5173`
 4. **Save your records**: Select **“保存到加密库”** (Save to encrypted vault). Set a master password on the first save, then use the existing password for updates. **Importing does not automatically save your records.**
 5. **Restore or export**: Unlock the local vault when you return. CSV exports contain only the currently filtered transactions.
 
+The current source also supports inclusive **posting-date ranges** and resetting all transaction filters. Date filters affect only the table and CSV export, without changing reward calculations. A reversed range shows an error and disables export. This feature is not included in the `v0.2.0-beta.2` installers.
+
 ### Transaction review and statement management
 
 These features are included starting with `v0.2.0-beta.2`.
@@ -73,6 +75,10 @@ These features are included starting with `v0.2.0-beta.2`.
 - Choose **Exclude from rewards** (不计奖赏 / 不計獎賞) to exclude a transaction from built-in and custom campaign estimates. Selecting a channel does not confirm campaign registration. The reading-oriented CSV export includes the current channel; full change history is retained in the encrypted vault and backups.
 - Expand the statement and reconciliation section to delete a selected statement and its linked transactions. Other statements, campaigns, and exchange rates remain. The original file can be imported again after deletion; manual corrections belonging to the deleted transactions are removed too.
 - Corrections and deletions persist only after **Save to encrypted vault**. Source files remain untouched. Reconciliation still describes the imported balance check and does not confirm payment channels or campaign eligibility.
+
+Maintenance improvements in the current source:
+
+- Clearing data or successfully restoring a backup discards unsaved campaign editor drafts; canceled or failed restores keep the current draft. A workspace containing only a manual exchange rate can also be exported as an encrypted backup.
 
 Reconciliation statuses:
 
