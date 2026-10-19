@@ -956,3 +956,59 @@ footer a {
 .date-filter p {
   width: 100%;
 }
+
+.activity-card,
+.campaign-breakdown {
+  min-width: 0;
+}
+.campaign-breakdown > details {
+  margin-top: 14px;
+}
+.period-calculation {
+  margin: 12px 0;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.period-calculation h4 {
+  margin-bottom: 10px;
+}
+.period-calculation dl > div {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin: 7px 0;
+  font-size: 12px;
+}
+.period-calculation dt {
+  color: var(--text-muted);
+}
+.period-calculation dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.exclusion-summary {
+  padding-left: 20px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.explanation-table {
+  overflow: auto;
+  margin-top: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.explanation-table table {
+  min-width: 560px;
+}
+.explanation-table td {
+  overflow-wrap: anywhere;
+}
+.explanation-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+}

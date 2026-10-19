@@ -1,6 +1,10 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { calculateCampaign, validateCampaign } from '../src/core/campaigns.js';
+import {
+  calculateCampaign,
+  validateCampaign,
+  explainCampaignTransactions,
+} from '../src/core/campaigns.js';
 import { fromScaledBigInt } from '../src/core/rewards.js';
 
 const campaign = (patch) => ({
@@ -193,4 +197,91 @@ describe('自定义活动精确计算', () => {
     ])
       assert.throws(() => validateCampaign(campaign(patch)));
   });
+});
+
+it('逐笔说明与计算共用筛选条件，每种排除原因均可追溯', () => {
+  const input = campaign({
+    cardId: 'bochk_custom',
+    last4: '1234',
+    channel: 'online',
+    merchant: 'SHOP',
+  });
+  const cases = [
+    [{}, 'spend'],
+    [{ direction: 'credit', category: 'credit' }, 'refund'],
+    [{ bankId: 'hsbc' }, 'bank'],
+    [{ currency: 'CNY' }, 'currency'],
+    [{ ruleId: 'other' }, 'card'],
+    [{ last4: '5678' }, 'last4'],
+    [{ day: '' }, 'missingDate'],
+    [{ day: '2027-01-01' }, 'future'],
+    [{ day: '2025-12-31' }, 'outsideDates'],
+    [{ category: 'fee' }, 'category'],
+    [{ channel: { key: 'exclude' } }, 'excluded'],
+    [{ channel: { key: 'applePay' } }, 'channel'],
+    [{ description: 'Different' }, 'merchant'],
+    [{ amount: '0' }, 'invalidAmount'],
+  ];
+  const transactions = cases.map(([patch]) => tx('100.00', patch));
+  const options = { today: '2026-12-31' };
+  const explanations = explainCampaignTransactions(
+    transactions,
+    input,
+    options,
+  );
+  assert.deepEqual(
+    explanations.map((item) => item.reason),
+    cases.map(([, reason]) => reason),
+  );
+  assert.equal(
+    explanations.filter((item) => item.included).length,
+    calculateCampaign(transactions, input, options).matchedCount,
+  );
+  assert.equal(explanations[0].period, '2026-01');
+  assert.equal(explanations[2].period, null);
+  assert.equal(
+    explainCampaignTransactions(
+      [tx('10')],
+      campaign({ registrationConfirmed: false }),
+      options,
+    )[0].reason,
+    'unconfirmed',
+  );
+  assert.equal(
+    explainCampaignTransactions(
+      [tx('10', { transactionDay: '' })],
+      campaign({ dateBasis: 'transaction' }),
+      options,
+    )[0].reason,
+    'missingDate',
+  );
+});
+it('周期明细正确显示封顶和实际扣回，不把扣回显示为大于可用奖赏', () => {
+  const result = calculate(
+    [tx('2000.00'), tx('500.00', { direction: 'credit' })],
+    { rewardCap: '10', minSpend: '1000' },
+  );
+  const period = result.periods[0];
+  assert.equal(fromScaledBigInt(period.netSpend), '1500.00');
+  assert.equal(fromScaledBigInt(period.used), '1000.00');
+  assert.equal(fromScaledBigInt(period.beforeRefund), '25.00');
+  assert.equal(fromScaledBigInt(period.cappedBeforeRefund), '10.00');
+  assert.equal(fromScaledBigInt(period.appliedClawback), '10.00');
+  assert.equal(
+    period.cashback,
+    period.cappedBeforeRefund - period.appliedClawback,
+  );
+  assert.equal(
+    calculate([tx('10')], { minSpend: '20' }).periods[0].thresholdMet,
+    false,
+  );
+  const unlimited = calculate([tx('100')], { spendingCap: '', rewardCap: '' })
+    .periods[0];
+  assert.equal(unlimited.spendingCap, null);
+  assert.equal(unlimited.rewardCap, null);
+  assert.equal(unlimited.remaining, null);
+});
+
+it('金额损坏仍然明确报错，计算说明不会将坏数据静默当成零', () => {
+  assert.throws(() => calculate([tx('bad')]), /金额格式无效/);
 });

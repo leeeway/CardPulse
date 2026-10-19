@@ -9,6 +9,7 @@ import {
 } from '../core/campaigns.js';
 import { fromScaledBigInt, getHongKongDate } from '../core/rewards.js';
 import { channelText } from '../core/i18n.js';
+import CampaignBreakdown from './CampaignBreakdown.jsx';
 
 export default function CampaignPanel({
   campaigns,
@@ -272,17 +273,11 @@ export default function CampaignPanel({
                   {result.campaign.startDate} → {result.campaign.endDate} ·{' '}
                   {t('匹配 {count} 笔', { count: result.matchedCount })}
                 </p>
-                <details>
-                  <summary>{t('本期估算')}</summary>
-                  {result.periods.map((period) => (
-                    <p key={period.key} className="small">
-                      {period.key === 'campaign' ? t('整个活动') : period.key} ·{' '}
-                      {result.campaign.currency}{' '}
-                      {fromScaledBigInt(period.cashback)}
-                      {!period.thresholdMet && ` · ${t('净消费门槛未达标')}`}
-                    </p>
-                  ))}
-                </details>
+                <CampaignBreakdown
+                  result={result}
+                  transactions={transactions}
+                  t={t}
+                />
               </>
             )}
             <div className="form-actions">
