@@ -46,7 +46,11 @@ import {
   THEMES,
 } from './core/preferences.js';
 import { translate, channelText } from './core/i18n.js';
-import { normalizeWorkspace, emptyWorkspace } from './core/workspace.js';
+import {
+  normalizeWorkspace,
+  emptyWorkspace,
+  hasWorkspaceData,
+} from './core/workspace.js';
 import CampaignPanel from './components/CampaignPanel.jsx';
 import BankWorkspace from './components/BankWorkspace.jsx';
 import DataSettings from './components/DataSettings.jsx';
@@ -65,6 +69,8 @@ const emptyFilters = () => ({
   direction: 'all',
   currency: 'all',
   category: 'all',
+  from: '',
+  to: '',
 });
 function download(content, fileName, type) {
   const url = URL.createObjectURL(new Blob([content], { type }));
@@ -85,7 +91,9 @@ export default function App() {
         : bank.name
       : t('未知');
   const [workspace, setWorkspace] = useState(emptyWorkspace);
+  const [workspaceSession, setWorkspaceSession] = useState(0);
   const { transactions, statements, campaigns } = workspace;
+  const workspaceHasData = hasWorkspaceData(workspace);
   const [activeBank, setActiveBank] = useState('all');
   const [importBank, setImportBank] = useState('hsbc');
   const [importCard, setImportCard] = useState('hsbc_pulse');
@@ -159,6 +167,9 @@ export default function App() {
     () => calculateRewards(bankTransactions, { hkdCnyRate: rateInfo.rate }),
     [bankTransactions, rateInfo.rate],
   );
+  const invalidDateRange = Boolean(
+    filters.from && filters.to && filters.from > filters.to,
+  );
   const reviewTarget = transactions.find((tx) => tx.id === reviewId);
   const showPulse = activeBank === 'all' || activeBank === 'hsbc';
 
@@ -177,6 +188,7 @@ export default function App() {
     }
   };
   const clearMemory = () => {
+    setWorkspaceSession((value) => value + 1);
     setReviewId(null);
     setWorkspace(emptyWorkspace());
     setFilters(emptyFilters());
@@ -285,8 +297,8 @@ export default function App() {
             );
             continue;
           }
-          next = mergeStatement(next, result, fingerprint);
-          setWorkspace(normalizeWorkspace(next));
+          next = normalizeWorkspace(mergeStatement(next, result, fingerprint));
+          setWorkspace(next);
           setDirty(true);
           messages.push({
             file: file.name,
@@ -332,6 +344,8 @@ export default function App() {
         )
           return;
         await saveToVault(data, masterPassword);
+        setWorkspaceSession((value) => value + 1);
+        setReviewId(null);
         setWorkspace(data);
         setHasVault(true);
         setVaultLocked(false);
@@ -402,21 +416,24 @@ export default function App() {
       )
     )
       return;
-    setWorkspace(removeStatement(workspace, statement.id));
+    const updated = removeStatement(workspace, statement.id);
+    const needsSave = hasVault || hasWorkspaceData(updated);
+    setWorkspace(updated);
     setReviewId(null);
-    setDirty(true);
-    setNotice([{ text: '结单及关联交易已删除，请保存到加密库。' }]);
+    setDirty(needsSave);
+    setNotice([
+      {
+        text: needsSave
+          ? '结单及关联交易已删除，请保存到加密库。'
+          : '已移除未保存的导入记录。',
+      },
+    ]);
   };
   const mutateCampaigns = (next) => {
     if (!unavailable && !isDemo) {
       const updated = { ...workspace, campaigns: next(campaigns) };
       setWorkspace(updated);
-      setDirty(
-        hasVault ||
-          updated.transactions.length > 0 ||
-          updated.campaigns.length > 0 ||
-          updated.exchangeRate != null,
-      );
+      setDirty(hasVault || hasWorkspaceData(updated));
     }
   };
   const resolvePdfPassword = (password) => {
@@ -576,18 +593,16 @@ export default function App() {
             <FolderOpen size={14} />
             {t('恢复加密备份')}
           </button>
-          {!vaultLocked &&
-            !isDemo &&
-            (transactions.length > 0 || campaigns.length > 0 || hasVault) && (
-              <button
-                className="btn btn-secondary"
-                disabled={unavailable}
-                onClick={() => openPassword('backup')}
-              >
-                <Archive size={14} />
-                {t('导出加密备份')}
-              </button>
-            )}
+          {!vaultLocked && !isDemo && (workspaceHasData || hasVault) && (
+            <button
+              className="btn btn-secondary"
+              disabled={unavailable}
+              onClick={() => openPassword('backup')}
+            >
+              <Archive size={14} />
+              {t('导出加密备份')}
+            </button>
+          )}
           {hasVault && (
             <button
               className="btn btn-secondary"
@@ -603,10 +618,7 @@ export default function App() {
           {!vaultLocked &&
             vaultReady &&
             !isDemo &&
-            (hasVault ||
-              transactions.length > 0 ||
-              campaigns.length > 0 ||
-              workspace.exchangeRate) && (
+            (hasVault || workspaceHasData) && (
               <button
                 className="btn btn-primary"
                 disabled={loadingFile || vaultBusy || rateBusy}
@@ -628,6 +640,7 @@ export default function App() {
           {activeTransactions.length > 0 && (
             <button
               className="btn btn-secondary"
+              disabled={invalidDateRange}
               onClick={() =>
                 download(
                   exportToSafeCsv(filteredList, t),
@@ -640,10 +653,7 @@ export default function App() {
               {t('导出 CSV')}
             </button>
           )}
-          {(hasVault ||
-            activeTransactions.length > 0 ||
-            campaigns.length > 0 ||
-            workspace.exchangeRate) && (
+          {(hasVault || workspaceHasData || activeTransactions.length > 0) && (
             <button
               className="btn btn-ghost"
               disabled={unavailable}
@@ -744,7 +754,7 @@ export default function App() {
         </section>
       )}
       <CampaignPanel
-        key={`${vaultLocked}-${isDemo}`}
+        key={`${workspaceSession}-${vaultLocked}-${isDemo}`}
         campaigns={
           isDemo
             ? []
@@ -990,6 +1000,62 @@ export default function App() {
                 </option>
               ))}
             </select>
+            <div
+              className="date-filter"
+              role="group"
+              aria-label={t('按记账日期筛选')}
+            >
+              <label>
+                <span>{t('记账起始日期')}</span>
+                <input
+                  type="date"
+                  aria-label={t('记账起始日期')}
+                  value={filters.from}
+                  max={filters.to || undefined}
+                  aria-invalid={invalidDateRange}
+                  aria-describedby={
+                    invalidDateRange ? 'date-filter-error' : undefined
+                  }
+                  onChange={(event) =>
+                    setFilters((prev) => ({
+                      ...prev,
+                      from: event.target.value,
+                    }))
+                  }
+                />
+              </label>
+              <label>
+                <span>{t('记账截止日期')}</span>
+                <input
+                  type="date"
+                  aria-label={t('记账截止日期')}
+                  value={filters.to}
+                  min={filters.from || undefined}
+                  aria-invalid={invalidDateRange}
+                  aria-describedby={
+                    invalidDateRange ? 'date-filter-error' : undefined
+                  }
+                  onChange={(event) =>
+                    setFilters((prev) => ({ ...prev, to: event.target.value }))
+                  }
+                />
+              </label>
+              <button
+                type="button"
+                className="btn btn-ghost"
+                onClick={() => setFilters(emptyFilters())}
+              >
+                {t('重置筛选')}
+              </button>
+              <p className="muted small">
+                {t('日期筛选仅影响交易列表和 CSV 导出，不改变奖赏计算。')}
+              </p>
+              {invalidDateRange && (
+                <p className="error" id="date-filter-error" role="alert">
+                  {t('起始日期不能晚于结束日期')}
+                </p>
+              )}
+            </div>
           </div>
         )}
         {filteredList.length ? (

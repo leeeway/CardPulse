@@ -1,5 +1,14 @@
 // UI text is translated explicitly; transaction descriptions and user activity names stay untouched.
 export const traditional = {
+  '已移除未保存的导入记录。': '已移除尚未儲存的匯入記錄。',
+  按记账日期筛选: '按記帳日期篩選',
+  记账起始日期: '記帳起始日期',
+  记账截止日期: '記帳截止日期',
+  重置筛选: '重設篩選',
+  起始日期不能晚于结束日期: '起始日期不可晚於結束日期',
+  '日期筛选仅影响交易列表和 CSV 导出，不改变奖赏计算。':
+    '日期篩選僅影響交易列表及 CSV 匯出，不改變獎賞計算。',
+
   核对交易: '核對交易',
   应用修正: '套用修正',
   修改记录: '修改記錄',

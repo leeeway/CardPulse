@@ -8,6 +8,12 @@ export const emptyWorkspace = () => ({
   campaigns: [],
   exchangeRate: null,
 });
+export const hasWorkspaceData = (workspace) =>
+  workspace.transactions.length > 0 ||
+  workspace.statements.length > 0 ||
+  workspace.campaigns.length > 0 ||
+  workspace.exchangeRate != null;
+
 const record = (value) =>
   value !== null && typeof value === 'object' && !Array.isArray(value);
 const optionalString = (value) => value == null || typeof value === 'string';

@@ -936,3 +936,23 @@ footer a {
 .review-history time {
   color: var(--text-muted);
 }
+
+.date-filter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 10px;
+  width: 100%;
+  font-size: 12px;
+}
+.date-filter label {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+.date-filter input {
+  max-width: 100%;
+}
+.date-filter p {
+  width: 100%;
+}
