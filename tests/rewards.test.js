@@ -1,6 +1,11 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { calculateRewards, fromScaledBigInt, toScaledBigInt } from '../src/core/rewards.js';
+import {
+  calculateRewards,
+  fromScaledBigInt,
+  toScaledBigInt,
+  explainPulseTransactions,
+} from '../src/core/rewards.js';
 
 describe('返现与额度精算引擎', () => {
   it('计算基础 0.4% 返现与赏世界 2%（普通人民币消费）', () => {
@@ -11,8 +16,8 @@ describe('返现与额度精算引擎', () => {
         amount: '10000.00',
         direction: 'debit',
         currency: 'CNY',
-        channel: { key: 'standard' }
-      }
+        channel: { key: 'standard' },
+      },
     ];
 
     const res = calculateRewards(txs, { today: '2026-03-10' });
@@ -34,8 +39,8 @@ describe('返现与额度精算引擎', () => {
         amount: '10000.00',
         direction: 'debit',
         currency: 'CNY',
-        channel: { key: 'applePay' }
-      }
+        channel: { key: 'applePay' },
+      },
     ];
 
     const res = calculateRewards(txs, { today: '2026-03-10' });
@@ -54,8 +59,8 @@ describe('返现与额度精算引擎', () => {
         amount: '120000.00',
         direction: 'debit',
         currency: 'CNY',
-        channel: { key: 'applePay' }
-      }
+        channel: { key: 'applePay' },
+      },
     ];
 
     const res = calculateRewards(txs, { today: '2026-04-10' });
@@ -77,7 +82,7 @@ describe('返现与额度精算引擎', () => {
         amount: '5000.00',
         direction: 'credit',
         currency: 'CNY',
-        category: 'repayment'
+        category: 'repayment',
       },
       {
         id: '2',
@@ -85,8 +90,8 @@ describe('返现与额度精算引擎', () => {
         amount: '300.00',
         direction: 'debit',
         currency: 'CNY',
-        category: 'fee'
-      }
+        category: 'fee',
+      },
     ];
 
     const res = calculateRewards(txs, { today: '2026-03-10' });
@@ -100,12 +105,22 @@ it('金额转换保留负数及小数符号', () => {
 });
 
 it('退款扣回奖赏但不释放额度，7月刷新专属消费额度', () => {
-  const tx = (id, day, amount, direction = 'debit') => ({ id, day, amount, direction, currency: 'CNY', channel: { key: 'applePay' } });
-  const result = calculateRewards([
-    tx('1', '2026-01-01', '80000.00'),
-    tx('2', '2026-02-01', '10000.00', 'credit'),
-    tx('3', '2026-07-01', '10000.00')
-  ], { today: '2026-07-02' });
+  const tx = (id, day, amount, direction = 'debit') => ({
+    id,
+    day,
+    amount,
+    direction,
+    currency: 'CNY',
+    channel: { key: 'applePay' },
+  });
+  const result = calculateRewards(
+    [
+      tx('1', '2026-01-01', '80000.00'),
+      tx('2', '2026-02-01', '10000.00', 'credit'),
+      tx('3', '2026-07-01', '10000.00'),
+    ],
+    { today: '2026-07-02' },
+  );
   assert.equal(fromScaledBigInt(result.world.used), '90000.00');
   assert.equal(fromScaledBigInt(result.pulse.periods[0].remaining), '0.00');
   assert.equal(fromScaledBigInt(result.pulse.remaining), '70000.00');
@@ -113,12 +128,118 @@ it('退款扣回奖赏但不释放额度，7月刷新专属消费额度', () => 
 });
 
 it('无汇率时港币折算未知，不将 Red 消费按 Pulse 核算', () => {
-  const result = calculateRewards([
-    { day: '2026-01-01', amount: '100.00', direction: 'debit', currency: 'HKD' },
-    { day: '2026-01-01', amount: '100.00', direction: 'debit', currency: 'HKD', ruleId: 'hsbc_red' }
-  ], { today: '2026-01-02' });
+  const result = calculateRewards(
+    [
+      {
+        day: '2026-01-01',
+        amount: '100.00',
+        direction: 'debit',
+        currency: 'HKD',
+      },
+      {
+        day: '2026-01-01',
+        amount: '100.00',
+        direction: 'debit',
+        currency: 'HKD',
+        ruleId: 'hsbc_red',
+      },
+    ],
+    { today: '2026-01-02' },
+  );
   assert.equal(result.totalCny, null);
   assert.equal(result.base.hkd, 40000n);
   assert.equal(result.includedCount, 1);
   assert.equal(result.pendingCount, 1);
+});
+
+it('Pulse 逐笔说明与计算共用筛选，并区分币种、费用、排除及日期', () => {
+  const base = {
+    bankId: 'hsbc',
+    ruleId: 'hsbc_pulse',
+    day: '2026-01-02',
+    amount: '100.00',
+    currency: 'CNY',
+    direction: 'debit',
+    category: 'spend',
+    channel: { key: 'applePay' },
+  };
+  const cases = [
+    [{}, 'cnyPulseSpend'],
+    [{ day: '2026-07-02' }, 'cnyPulseSpend'],
+    [{ channel: { key: 'standard', uncertain: true } }, 'cnyStandardSpend'],
+    [{ direction: 'credit', category: 'credit' }, 'cnyPulseRefund'],
+    [
+      { direction: 'credit', category: 'credit', channel: { key: 'standard' } },
+      'cnyStandardRefund',
+    ],
+    [{ currency: 'HKD' }, 'hkdSpend'],
+    [{ currency: 'HKD', direction: 'credit' }, 'hkdRefund'],
+    [{ bankId: 'bochk' }, 'unsupportedCard'],
+    [{ ruleId: 'hsbc_red' }, 'unsupportedCard'],
+    [{ currency: 'USD' }, 'currency'],
+    [{ category: 'fee' }, 'category'],
+    [{ category: 'repayment', direction: 'credit' }, 'category'],
+    [{ channel: { key: 'exclude' } }, 'excluded'],
+    [{ day: '2025-12-31' }, 'outsideYear'],
+    [{ day: '2027-01-01' }, 'outsideYear'],
+  ];
+  const transactions = cases.map(([patch], index) => ({
+    ...base,
+    ...patch,
+    id: String(index),
+  }));
+  const options = { today: '2026-10-19' };
+  const entries = explainPulseTransactions(transactions, options);
+  const result = calculateRewards(transactions, options);
+  assert.deepEqual(
+    entries.map((entry) => entry.reason),
+    cases.map(([, reason]) => reason),
+  );
+  assert.equal(
+    entries.filter((entry) => entry.included).length,
+    result.includedCount,
+  );
+  assert.equal(
+    entries.filter((entry) => entry.pending).length,
+    result.pendingCount,
+  );
+  assert.equal(entries[0].period, '2026-H1');
+  assert.equal(entries[1].period, '2026-H2');
+  assert.equal(entries[5].period, '2026');
+  assert.equal(entries[2].uncertain, true);
+});
+it('Pulse 说明遵循手动覆盖和仅基础退款设置，不改变封顶扣回结果', () => {
+  const transactions = [
+    {
+      id: 'sale',
+      day: '2026-01-01',
+      amount: '1000',
+      direction: 'debit',
+      currency: 'CNY',
+      channel: { key: 'standard', uncertain: true },
+    },
+    {
+      id: 'refund',
+      day: '2026-02-01',
+      amount: '100',
+      direction: 'credit',
+      currency: 'CNY',
+      channel: { key: 'applePay' },
+    },
+  ];
+  const options = {
+    today: '2026-10-19',
+    overrides: {
+      sale: { channel: 'applePay' },
+      refund: { refundBaseOnly: true },
+    },
+  };
+  const result = calculateRewards(transactions, options);
+  const entries = explainPulseTransactions(transactions, options);
+  assert.equal(entries[0].reason, 'cnyPulseSpend');
+  assert.equal(entries[0].uncertain, false);
+  assert.equal(entries[1].reason, 'baseOnlyRefund');
+  assert.equal(fromScaledBigInt(result.base.cny), '3.60');
+  assert.equal(fromScaledBigInt(result.world.cashback), '20.00');
+  assert.equal(fromScaledBigInt(result.pulse.cashback), '20.00');
 });

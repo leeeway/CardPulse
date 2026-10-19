@@ -63,6 +63,16 @@ try {
     .selectOption('applePay');
   await page.getByRole('button', { name: '应用修正', exact: true }).click();
   assert.match(await page.locator('tbody tr').innerText(), /已人工修正/);
+  await page.getByText('Pulse 计算明细', { exact: true }).click();
+  await page.getByText('Pulse 逐笔说明', { exact: true }).click();
+  await page
+    .getByText('计入人民币基础、年度及半年额外奖赏', { exact: true })
+    .waitFor();
+  await page.getByText('Pulse 逐笔说明', { exact: true }).click();
+  await page
+    .locator('.pulse-breakdown .explanation-table')
+    .waitFor({ state: 'detached' });
+
   await page
     .getByLabel('参考汇率（1 HKD = CNY）', { exact: true })
     .fill('0.93');
@@ -177,7 +187,7 @@ try {
   assert.equal(await page.locator('tbody tr').count(), 0);
   assert.equal(await page.locator('.statement-row').count(), 0);
   console.log(
-    'PASS: Electron secure origin, isolated renderer, packaged PDF worker, offline startup/import, encrypted PDF password retry, native encrypted file, manual FX persistence, backup/export/restore, transaction review history, statement deletion, reload and full application restart.',
+    'PASS: Electron secure origin, isolated renderer, packaged PDF worker, offline startup/import, encrypted PDF password retry, native encrypted file, manual FX persistence, backup/export/restore, Pulse calculation explanations, transaction review history, statement deletion, reload and full application restart.',
   );
 } finally {
   if (application) await application.close();

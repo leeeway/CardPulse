@@ -28,6 +28,7 @@ import {
 } from './core/imports.js';
 import { reviewTransaction, categoryText } from './core/review.js';
 import TransactionReviewDialog from './components/TransactionReviewDialog.jsx';
+import PulseBreakdown from './components/PulseBreakdown.jsx';
 import {
   saveToVault,
   loadFromVault,
@@ -724,7 +725,11 @@ export default function App() {
               title={t('基础净签账返现')}
               badge={t('0.4% 无上限')}
               value={rewards.base.totalCny}
-              description={t('港币部分已折算')}
+              description={t(
+                rewards.base.hkdConvertedCny === null
+                  ? '缺少汇率，港币部分尚未折算'
+                  : '港币部分已折算',
+              )}
             />
             <RewardCard
               title={t('赏世界额外奖赏')}
@@ -744,6 +749,13 @@ export default function App() {
               description={`${t('当前半年额度')} · ${rewards.pulse.progress.toFixed(1)}%`}
             />
           </div>
+          <PulseBreakdown
+            key={`${workspaceSession}-${vaultLocked}-${isDemo}-${activeBank}`}
+            result={rewards}
+            transactions={bankTransactions}
+            rate={rateInfo.rate}
+            t={t}
+          />
           <p className="muted small">
             {t(
               '内置模型未核验最新活动资格，仅适用于 Pulse；其他卡片请配置自定义活动。',
