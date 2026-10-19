@@ -134,6 +134,8 @@ Select Add campaign and configure the bank, card or last four digits, currency, 
 - Each campaign calculates one currency. Percentage rates accept up to two decimal places. Calculations use fixed-point integers, with displayed rewards rounded to cents.
 - Campaign estimates are independent. The app does not add them together or decide whether they stack with other campaigns or Pulse rewards. Search filters only affect the transaction table and CSV export, not campaign matching.
 
+**Calculation explanations (current source):** Expand the period estimate to inspect gross spending, refunds, net spending, thresholds, spending caps, remaining allowances, rewards before/after capping, and applied refund clawbacks. Expand transaction explanations to see inclusion or the first exclusion reason, filter included/excluded records, and page through 25 records at a time. Explanations share the calculation's matching logic. Caps remain period aggregates rather than per-transaction rewards. Uncertain channels retain a warning; displayed rounding can cause small component differences. Explanations are derived in memory without changing the encrypted workspace schema. These features are not included in the `v0.2.0-beta.2` installers.
+
 **Extension assessment:** Flat rates, caps, calendar periods, and thresholds fit a shared configuration model and are implemented. Points/miles conversion, tiered rates, statement cycles, cross-period refund matching, shared principal/supplementary allowances, and stacking need dedicated models. Native bank PDFs also need layout fixtures and reconciliation checks. For example, the [official Standard Chartered Smart page](https://www.sc.com/hk/credit-cards/smart/) describes statement-cycle spending, which cannot be replaced with calendar months. Bank links provide official references for manual checking, not verified reward presets.
 
 ## Privacy and data
@@ -195,7 +197,7 @@ Node.js 24.12+ is recommended. Build tools need a network connection to download
 
 These features are not implemented and are outside the current support scope. Suggested order:
 
-1. **Explainable calculations**: show matching rules, exclusions, refund clawbacks, thresholds, and allowance usage per transaction for comparison with bank postings.
+1. **Pulse explanations**: extend the custom campaign explanations to cover built-in matching rules, annual/half-year allowances, and refund clawbacks.
 2. **Campaign models**: add tiers, points, and statement cycles; define stacking and exclusions, and link refunds across periods.
 3. **More native bank PDFs**: collect redacted fixtures and reconciliation tests before adding each adapter; retain standard CSV as the common import route.
 4. **Desktop experience**: idle locking, password changes, and backup reminders; complete native Windows verification and release signing.
