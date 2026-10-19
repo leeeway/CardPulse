@@ -251,7 +251,7 @@ function matchPulseTransaction(tx, today, overrides) {
     uncertain,
     day: tx.day,
     period:
-      tx.currency === 'CNY' && isPulseEligible && !(isCredit && refundBaseOnly)
+      tx.currency === 'CNY' && isPulseEligible && !isCredit
         ? `${year}-H${tx.day.slice(5, 7) < '07' ? 1 : 2}`
         : year,
     amount,

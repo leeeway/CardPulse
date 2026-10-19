@@ -205,6 +205,7 @@ it('Pulse 逐笔说明与计算共用筛选，并区分币种、费用、排除�
   );
   assert.equal(entries[0].period, '2026-H1');
   assert.equal(entries[1].period, '2026-H2');
+  assert.equal(entries[3].period, '2026');
   assert.equal(entries[5].period, '2026');
   assert.equal(entries[2].uncertain, true);
 });

@@ -56,6 +56,8 @@ test('Pulse explanations reconcile annual and half-year pools and show missing F
   await pulse.getByText('Pulse 逐笔说明', { exact: true }).click();
   const audit = pulse.locator('.transaction-explanations');
   await expect(audit).toContainText('计入 5 笔，排除 5 笔');
+  await expect(audit.locator('tbody tr').filter({ hasText: 'REFUND' })).toContainText('2026');
+  await expect(audit.locator('tbody tr').filter({ hasText: 'REFUND' })).not.toContainText('2026-H1');
   await audit.getByLabel('说明记录范围').selectOption('excluded');
   await expect(audit.locator('tbody tr')).toHaveCount(5);
   await expect(audit).toContainText('不适用 Pulse 内置模型');
