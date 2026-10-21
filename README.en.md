@@ -199,9 +199,11 @@ Node.js 24.12+ is recommended. Build tools need a network connection to download
 
 The main branch now refreshes the calculation cutoff while the app stays open: it checks the Hong Kong date every 30 seconds and on window focus or page visibility changes. Pulse, custom campaigns, and transaction explanations share this date. This fix is not included in the v0.2.0-beta.3 installers.
 
+The main branch also protects against conflicting browser tabs: saving, restoring, and clearing compare the stored ciphertext within the same transaction as the write. Conflicts preserve the current page’s edits so you can export an encrypted backup before reloading or locking and unlocking the latest data. Changes are not merged automatically. Reload all older tabs after upgrading to enable this protection. This fix is not included in the v0.2.0-beta.3 installers.
+
 These features are not implemented and are outside the current support scope. Suggested order:
 
-1. **Data protection**: prevent stale saves in one browser tab from overwriting newer changes in another; add password changes, backup reminders, and idle locking that protects unsaved edits.
+1. **Data protection**: add password changes, backup reminders, and idle locking that protects unsaved edits.
 2. **Desktop release quality**: verify installation, upgrades, and data retention after uninstall on Windows hardware, and add release signing.
 3. **Campaign models**: add tiers, points, and statement cycles; define stacking and exclusions, and link refunds across periods.
 4. **More native bank PDFs**: collect redacted fixtures and reconciliation tests before adding each adapter; retain standard CSV as the common import route.
