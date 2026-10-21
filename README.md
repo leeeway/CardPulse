@@ -20,19 +20,19 @@ CardPulse 是一个本地处理的信用卡 PDF 账单分析工具。导入受�
 
 ## 桌面版下载与安装
 
-从 [GitHub Releases](https://github.com/leeeway/CardPulse/releases) 下载 `v0.2.0-beta.3` 桌面预览版。安装后即可使用，无需 Node.js、浏览器服务、账号或业务服务器。
+从 [GitHub Releases](https://github.com/leeeway/CardPulse/releases) 下载 `v0.2.0` 桌面正式版。安装后即可使用，无需 Node.js、浏览器服务、账号或业务服务器。
 
 | 系统 | 下载文件 | 安装方式 |
 | --- | --- | --- |
-| macOS 13+ · Apple 芯片 | `CardPulse-0.2.0-beta.3-mac-arm64.dmg` | 打开 DMG，将 CardPulse 拖到“应用程序” |
-| macOS 13+ · Intel | `CardPulse-0.2.0-beta.3-mac-x64.dmg` | 打开 DMG，将 CardPulse 拖到“应用程序” |
-| Windows 10 / 11 · x64 | `CardPulse-0.2.0-beta.3-win-x64.exe` | 运行安装向导，可为当前用户选择安装目录 |
+| macOS 13+ · Apple 芯片 | `CardPulse-0.2.0-mac-arm64.dmg` | 打开 DMG，将 CardPulse 拖到“应用程序” |
+| macOS 13+ · Intel | `CardPulse-0.2.0-mac-x64.dmg` | 打开 DMG，将 CardPulse 拖到“应用程序” |
+| Windows 10 / 11 · x64 | `CardPulse-0.2.0-win-x64.exe` | 运行安装向导，可为当前用户选择安装目录 |
 
-Mac 同时提供 ZIP 包。此预览版的 Mac 包仅有本地 ad-hoc 签名，未使用 Apple Developer ID 签名或公证；Windows 包没有 Authenticode 发布者签名。系统可能拦截首次启动。确认来源及 SHA-256 后，可按 macOS“系统设置 → 隐私与安全性 → 仍要打开”或 Windows SmartScreen 的提示自行决定是否运行。请勿关闭系统全局安全保护。
+Mac 同时提供 ZIP 包。Mac 包仅有本地 ad-hoc 签名，未使用 Apple Developer ID 签名或公证；Windows 包没有 Authenticode 发布者签名。系统可能拦截首次启动。确认来源及 SHA-256 后，可按 macOS“系统设置 → 隐私与安全性 → 仍要打开”或 Windows SmartScreen 的提示自行决定是否运行。请勿关闭系统全局安全保护。
 
-Release 提供 `SHA256SUMS.txt`。将其与下载包放在同一目录，在 macOS 可运行 `shasum -a 256 -c SHA256SUMS.txt` 校验已下载文件；未下载的文件会报告缺失，可忽略其缺失提示。在 Windows PowerShell 可运行 `Get-FileHash .\CardPulse-0.2.0-beta.3-win-x64.exe -Algorithm SHA256` 并与清单比对。
+Release 提供 `SHA256SUMS.txt`。将其与下载包放在同一目录，在 macOS 可运行 `shasum -a 256 -c SHA256SUMS.txt` 校验已下载文件；未下载的文件会报告缺失，可忽略其缺失提示。在 Windows PowerShell 可运行 `Get-FileHash .\CardPulse-0.2.0-win-x64.exe -Algorithm SHA256` 并与清单比对。
 
-这是桌面测试版。Mac 打包应用会进行启动、解析与持久化测试；Windows 安装包由 macOS 交叉构建，尚未经过原生 Windows 运行验收。问题可通过 Issues 反馈。卸载前建议先导出加密备份。
+Mac 打包应用会进行启动、解析与持久化测试；Windows 安装包由 macOS 交叉构建，尚未经过原生 Windows 运行验收。问题可通过 Issues 反馈。卸载前建议先导出加密备份。
 
 桌面数据保存在当前系统用户的应用数据目录：macOS 为 `~/Library/Application Support/CardPulse/vault.cardpulse`，Windows 为 `%APPDATA%/CardPulse/vault.cardpulse`。应用更新沿用此目录，安装包不包含个人账单。卸载程序不主动删除 Windows 数据目录；手动清理系统数据仍可能删除保险库。
 
@@ -197,9 +197,9 @@ npm run desktop:win    # Windows x64：NSIS 安装包
 
 ## 后续计划
 
-主分支已修复长时间打开页面时估算截止日不更新的问题：按香港日期每 30 秒检查，窗口重新获得焦点或页面可见性变化时也会刷新，Pulse、自定义活动和逐笔说明使用同一截止日。此修复尚未包含在 v0.2.0-beta.3 安装包中。
+`v0.2.0` 已修复长时间打开页面时估算截止日不更新的问题：按香港日期每 30 秒检查，窗口重新获得焦点或页面可见性变化时也会刷新，Pulse、自定义活动和逐笔说明使用同一截止日。此修复已包含在正式版安装包中。
 
-主分支也已加入浏览器多标签冲突保护：保存、恢复和清空前会在同一事务中比对本地密文是否变化。发生冲突时保留当前页面修改，可先导出加密备份，再刷新或锁定后解锁最新数据。不会自动合并。升级后请重新加载所有旧标签页以启用保护；此修复尚未包含在 v0.2.0-beta.3 安装包中。
+`v0.2.0` 也已加入浏览器多标签冲突保护：保存、恢复和清空前会在同一事务中比对本地密文是否变化。发生冲突时保留当前页面修改，可先导出加密备份，再刷新或锁定后解锁最新数据。不会自动合并。升级后请重新加载所有旧标签页以启用保护；此修复已包含在正式版安装包中。
 
 以下功能尚未完成，不属于当前支持范围。建议按以下顺序推进：
 

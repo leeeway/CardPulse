@@ -52,7 +52,7 @@ jobs:
           pattern: desktop-*
           merge-multiple: true
           path: artifacts
-      - name: Publish prerelease with SHA-256 manifest
+      - name: Publish release with SHA-256 manifest
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
@@ -60,4 +60,10 @@ jobs:
         working-directory: artifacts
         run: |
           sha256sum *.dmg *.zip *.exe > SHA256SUMS.txt
-          gh release create "$RELEASE_TAG" ./* --verify-tag --prerelease --title "CardPulse $RELEASE_TAG" --notes "Desktop preview. macOS uses ad-hoc signing without notarization; Windows has no Authenticode signature. See README for installation and privacy details."
+          flags=()
+          if [[ "$RELEASE_TAG" == *-* ]]; then
+            flags+=(--prerelease)
+          else
+            flags+=(--latest)
+          fi
+          gh release create "$RELEASE_TAG" ./* --verify-tag "${flags[@]}" --title "CardPulse $RELEASE_TAG" --notes "Desktop release. macOS uses ad-hoc signing without notarization; Windows has no Authenticode signature. See README for installation and privacy details."

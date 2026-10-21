@@ -20,19 +20,19 @@ It is designed for people who want to organize several months of statements whil
 
 ## Desktop downloads and installation
 
-Download the `v0.2.0-beta.3` desktop preview from [GitHub Releases](https://github.com/leeeway/CardPulse/releases). End users do not need Node.js, a development server, an account, or a business backend.
+Download the `v0.2.0` desktop release from [GitHub Releases](https://github.com/leeeway/CardPulse/releases). End users do not need Node.js, a development server, an account, or a business backend.
 
 | System | Download | Installation |
 | --- | --- | --- |
-| macOS 13+ · Apple silicon | `CardPulse-0.2.0-beta.3-mac-arm64.dmg` | Open the DMG and drag CardPulse to Applications |
-| macOS 13+ · Intel | `CardPulse-0.2.0-beta.3-mac-x64.dmg` | Open the DMG and drag CardPulse to Applications |
-| Windows 10 / 11 · x64 | `CardPulse-0.2.0-beta.3-win-x64.exe` | Run the per-user installation wizard and choose a destination |
+| macOS 13+ · Apple silicon | `CardPulse-0.2.0-mac-arm64.dmg` | Open the DMG and drag CardPulse to Applications |
+| macOS 13+ · Intel | `CardPulse-0.2.0-mac-x64.dmg` | Open the DMG and drag CardPulse to Applications |
+| Windows 10 / 11 · x64 | `CardPulse-0.2.0-win-x64.exe` | Run the per-user installation wizard and choose a destination |
 
 ZIP archives are also provided for Mac. Mac packages use ad-hoc signing without Apple Developer ID signing or notarization; Windows packages have no Authenticode publisher signature. Your OS may block the first launch. After checking the source and SHA-256, decide whether to use macOS System Settings → Privacy & Security → Open Anyway, or the Windows SmartScreen prompts. Do not disable system-wide security protections.
 
-The release includes `SHA256SUMS.txt`. Place it alongside downloaded packages. On macOS, run `shasum -a 256 -c SHA256SUMS.txt`; entries for packages you did not download report missing files and can be ignored. On Windows PowerShell, compare `Get-FileHash .\CardPulse-0.2.0-beta.3-win-x64.exe -Algorithm SHA256` with the manifest.
+The release includes `SHA256SUMS.txt`. Place it alongside downloaded packages. On macOS, run `shasum -a 256 -c SHA256SUMS.txt`; entries for packages you did not download report missing files and can be ignored. On Windows PowerShell, compare `Get-FileHash .\CardPulse-0.2.0-win-x64.exe -Algorithm SHA256` with the manifest.
 
-This is a desktop beta. Packaged Mac apps undergo startup, parsing, and persistence tests. The Windows installer is cross-built on macOS and has not undergone native Windows runtime acceptance testing. Report issues through Issues. Export an encrypted backup before uninstalling.
+Packaged Mac apps undergo startup, parsing, and persistence tests. The Windows installer is cross-built on macOS and has not undergone native Windows runtime acceptance testing. Report issues through Issues. Export an encrypted backup before uninstalling.
 
 Desktop records are stored in the current OS user profile: `~/Library/Application Support/CardPulse/vault.cardpulse` on macOS, or `%APPDATA%/CardPulse/vault.cardpulse` on Windows. Updates reuse this directory; installers contain no personal statements. The Windows uninstaller does not actively delete application data, but manual system cleanup may remove it.
 
@@ -197,9 +197,9 @@ Node.js 24.12+ is recommended. Build tools need a network connection to download
 
 ## Planned work
 
-The main branch now refreshes the calculation cutoff while the app stays open: it checks the Hong Kong date every 30 seconds and on window focus or page visibility changes. Pulse, custom campaigns, and transaction explanations share this date. This fix is not included in the v0.2.0-beta.3 installers.
+`v0.2.0` refreshes the calculation cutoff while the app stays open: it checks the Hong Kong date every 30 seconds and on window focus or page visibility changes. Pulse, custom campaigns, and transaction explanations share this date. This fix is included in the release installers.
 
-The main branch also protects against conflicting browser tabs: saving, restoring, and clearing compare the stored ciphertext within the same transaction as the write. Conflicts preserve the current page’s edits so you can export an encrypted backup before reloading or locking and unlocking the latest data. Changes are not merged automatically. Reload all older tabs after upgrading to enable this protection. This fix is not included in the v0.2.0-beta.3 installers.
+`v0.2.0` also protects against conflicting browser tabs: saving, restoring, and clearing compare the stored ciphertext within the same transaction as the write. Conflicts preserve the current page’s edits so you can export an encrypted backup before reloading or locking and unlocking the latest data. Changes are not merged automatically. Reload all older tabs after upgrading to enable this protection. This fix is included in the release installers.
 
 These features are not implemented and are outside the current support scope. Suggested order:
 

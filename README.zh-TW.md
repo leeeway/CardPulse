@@ -20,19 +20,19 @@ CardPulse 是一個在本機處理資料的信用卡 PDF 結單分析工具。�
 
 ## 桌面版下載與安裝
 
-從 [GitHub Releases](https://github.com/leeeway/CardPulse/releases) 下載 `v0.2.0-beta.3` 桌面預覽版。安裝後即可使用，毋須 Node.js、瀏覽器服務、帳戶或業務伺服器。
+從 [GitHub Releases](https://github.com/leeeway/CardPulse/releases) 下載 `v0.2.0` 桌面正式版。安裝後即可使用，毋須 Node.js、瀏覽器服務、帳戶或業務伺服器。
 
 | 系統 | 下載檔案 | 安裝方式 |
 | --- | --- | --- |
-| macOS 13+ · Apple 晶片 | `CardPulse-0.2.0-beta.3-mac-arm64.dmg` | 開啟 DMG，將 CardPulse 拖至「應用程式」 |
-| macOS 13+ · Intel | `CardPulse-0.2.0-beta.3-mac-x64.dmg` | 開啟 DMG，將 CardPulse 拖至「應用程式」 |
-| Windows 10 / 11 · x64 | `CardPulse-0.2.0-beta.3-win-x64.exe` | 執行安裝精靈，可為目前使用者選擇安裝目錄 |
+| macOS 13+ · Apple 晶片 | `CardPulse-0.2.0-mac-arm64.dmg` | 開啟 DMG，將 CardPulse 拖至「應用程式」 |
+| macOS 13+ · Intel | `CardPulse-0.2.0-mac-x64.dmg` | 開啟 DMG，將 CardPulse 拖至「應用程式」 |
+| Windows 10 / 11 · x64 | `CardPulse-0.2.0-win-x64.exe` | 執行安裝精靈，可為目前使用者選擇安裝目錄 |
 
-Mac 亦提供 ZIP。此預覽版的 Mac 套件只有本機 ad-hoc 簽署，未使用 Apple Developer ID 簽署或公證；Windows 套件沒有 Authenticode 發行者簽署。系統可能攔截首次啟動。確認來源及 SHA-256 後，可依 macOS「系統設定 → 私隱與保安 → 仍要開啟」或 Windows SmartScreen 提示自行決定是否執行。請勿關閉系統全域安全保護。
+Mac 亦提供 ZIP。Mac 套件只有本機 ad-hoc 簽署，未使用 Apple Developer ID 簽署或公證；Windows 套件沒有 Authenticode 發行者簽署。系統可能攔截首次啟動。確認來源及 SHA-256 後，可依 macOS「系統設定 → 私隱與保安 → 仍要開啟」或 Windows SmartScreen 提示自行決定是否執行。請勿關閉系統全域安全保護。
 
-Release 提供 `SHA256SUMS.txt`。將其與下載套件放在同一目錄，在 macOS 可執行 `shasum -a 256 -c SHA256SUMS.txt` 校驗已下載檔案；未下載的檔案會報告缺失，可忽略其缺失提示。在 Windows PowerShell 可執行 `Get-FileHash .\CardPulse-0.2.0-beta.3-win-x64.exe -Algorithm SHA256` 並與清單比對。
+Release 提供 `SHA256SUMS.txt`。將其與下載套件放在同一目錄，在 macOS 可執行 `shasum -a 256 -c SHA256SUMS.txt` 校驗已下載檔案；未下載的檔案會報告缺失，可忽略其缺失提示。在 Windows PowerShell 可執行 `Get-FileHash .\CardPulse-0.2.0-win-x64.exe -Algorithm SHA256` 並與清單比對。
 
-這是桌面測試版。Mac 打包應用程式會進行啟動、解析及持久化測試；Windows 安裝套件由 macOS 交叉建置，尚未經原生 Windows 執行驗收。問題可透過 Issues 回報。解除安裝前建議先匯出加密備份。
+Mac 打包應用程式會進行啟動、解析及持久化測試；Windows 安裝套件由 macOS 交叉建置，尚未經原生 Windows 執行驗收。問題可透過 Issues 回報。解除安裝前建議先匯出加密備份。
 
 桌面資料儲存在目前系統使用者的應用程式資料目錄：macOS 為 `~/Library/Application Support/CardPulse/vault.cardpulse`，Windows 為 `%APPDATA%/CardPulse/vault.cardpulse`。更新沿用此目錄，安裝套件不包含個人結單。解除安裝程式不主動刪除 Windows 資料目錄；手動清理系統資料仍可能刪除保險庫。
 
@@ -197,9 +197,9 @@ npm run desktop:win    # Windows x64：NSIS 安裝套件
 
 ## 後續計劃
 
-主分支已修正長時間開啟頁面時估算截止日不更新的問題：按香港日期每 30 秒檢查，視窗重新獲得焦點或頁面可見性變更時亦會更新，Pulse、自訂活動及逐筆說明使用同一截止日。此修正尚未包含於 v0.2.0-beta.3 安裝套件。
+`v0.2.0` 已修正長時間開啟頁面時估算截止日不更新的問題：按香港日期每 30 秒檢查，視窗重新獲得焦點或頁面可見性變更時亦會更新，Pulse、自訂活動及逐筆說明使用同一截止日。此修正已包含於正式版安裝套件。
 
-主分支亦已加入瀏覽器多分頁衝突保護：儲存、還原和清空前會在同一交易中比對本機密文是否變更。發生衝突時保留目前分頁修改，可先匯出加密備份，再重新整理或鎖定後解鎖最新資料。不會自動合併。升級後請重新載入所有舊分頁以啟用保護；此修正尚未包含於 v0.2.0-beta.3 安裝套件。
+`v0.2.0` 亦已加入瀏覽器多分頁衝突保護：儲存、還原和清空前會在同一交易中比對本機密文是否變更。發生衝突時保留目前分頁修改，可先匯出加密備份，再重新整理或鎖定後解鎖最新資料。不會自動合併。升級後請重新載入所有舊分頁以啟用保護；此修正已包含於正式版安裝套件。
 
 以下功能尚未完成，不屬於目前支援範圍。建議依以下順序推進：
 
