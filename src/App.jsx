@@ -53,6 +53,7 @@ import {
   hasWorkspaceData,
 } from './core/workspace.js';
 import CampaignPanel from './components/CampaignPanel.jsx';
+import useHongKongDate from './hooks/useHongKongDate.js';
 import BankWorkspace from './components/BankWorkspace.jsx';
 import DataSettings from './components/DataSettings.jsx';
 import PdfPasswordDialog from './components/PdfPasswordDialog.jsx';
@@ -83,6 +84,7 @@ function download(content, fileName, type) {
 }
 
 export default function App() {
+  const today = useHongKongDate();
   const [preferences, setPreferences] = useState(() => readPreferences());
   const t = (text, values) => translate(preferences.locale, text, values);
   const bankName = (bank) =>
@@ -165,8 +167,9 @@ export default function App() {
     [bankTransactions, filters],
   );
   const rewards = useMemo(
-    () => calculateRewards(bankTransactions, { hkdCnyRate: rateInfo.rate }),
-    [bankTransactions, rateInfo.rate],
+    () =>
+      calculateRewards(bankTransactions, { today, hkdCnyRate: rateInfo.rate }),
+    [bankTransactions, rateInfo.rate, today],
   );
   const invalidDateRange = Boolean(
     filters.from && filters.to && filters.from > filters.to,
@@ -767,6 +770,7 @@ export default function App() {
       )}
       <CampaignPanel
         key={`${workspaceSession}-${vaultLocked}-${isDemo}`}
+        today={today}
         campaigns={
           isDemo
             ? []

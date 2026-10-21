@@ -7,11 +7,12 @@ import {
   PERIODS,
   CHANNELS,
 } from '../core/campaigns.js';
-import { fromScaledBigInt, getHongKongDate } from '../core/rewards.js';
+import { fromScaledBigInt } from '../core/rewards.js';
 import { channelText } from '../core/i18n.js';
 import CampaignBreakdown from './CampaignBreakdown.jsx';
 
 export default function CampaignPanel({
+  today,
   campaigns,
   transactions,
   disabled,
@@ -26,15 +27,14 @@ export default function CampaignPanel({
     () =>
       campaigns.map((campaign) => {
         try {
-          return { ...calculateCampaign(transactions, campaign) };
+          return { ...calculateCampaign(transactions, campaign, { today }) };
         } catch (error) {
           return { campaign, error: error.message };
         }
       }),
-    [campaigns, transactions],
+    [campaigns, transactions, today],
   );
   const create = () => {
-    const today = getHongKongDate();
     setError('');
     setDraft({
       id: crypto.randomUUID(),
