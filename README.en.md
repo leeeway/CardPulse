@@ -197,12 +197,15 @@ Node.js 24.12+ is recommended. Build tools need a network connection to download
 
 ## Planned work
 
+The main branch now refreshes the calculation cutoff while the app stays open: it checks the Hong Kong date every 30 seconds and on window focus or page visibility changes. Pulse, custom campaigns, and transaction explanations share this date. This fix is not included in the v0.2.0-beta.3 installers.
+
 These features are not implemented and are outside the current support scope. Suggested order:
 
-1. **Campaign models**: add tiers, points, and statement cycles; define stacking and exclusions, and link refunds across periods.
-2. **More native bank PDFs**: collect redacted fixtures and reconciliation tests before adding each adapter; retain standard CSV as the common import route.
-3. **Desktop experience**: idle locking, password changes, and backup reminders; complete native Windows verification and release signing.
-4. **Further extensions**: local OCR, Beancount / Ledger export, and spending strategy simulation.
+1. **Data protection**: prevent stale saves in one browser tab from overwriting newer changes in another; add password changes, backup reminders, and idle locking that protects unsaved edits.
+2. **Desktop release quality**: verify installation, upgrades, and data retention after uninstall on Windows hardware, and add release signing.
+3. **Campaign models**: add tiers, points, and statement cycles; define stacking and exclusions, and link refunds across periods.
+4. **More native bank PDFs**: collect redacted fixtures and reconciliation tests before adding each adapter; retain standard CSV as the common import route.
+5. **Further extensions**: local OCR, Beancount / Ledger export, and spending strategy simulation.
 
 Local vaults and encrypted backups validate data versions, record IDs, and key nested fields. Unsupported versions and damaged content are rejected before they can cause errors after restoration.
 
