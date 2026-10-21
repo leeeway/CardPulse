@@ -29,12 +29,7 @@ import {
 import { reviewTransaction, categoryText } from './core/review.js';
 import TransactionReviewDialog from './components/TransactionReviewDialog.jsx';
 import PulseBreakdown from './components/PulseBreakdown.jsx';
-import {
-  saveToVault,
-  loadFromVault,
-  clearVault,
-  hasEncryptedVault,
-} from './core/storage.js';
+import { createVaultClient } from './core/storage.js';
 import { BANKS, getBank, bankOf, cardsFor, cardName } from './core/banks.js';
 import {
   CSV_TEMPLATE,
@@ -85,6 +80,8 @@ function download(content, fileName, type) {
 
 export default function App() {
   const today = useHongKongDate();
+  const [{ saveToVault, loadFromVault, clearVault, hasEncryptedVault }] =
+    useState(createVaultClient);
   const [preferences, setPreferences] = useState(() => readPreferences());
   const t = (text, values) => translate(preferences.locale, text, values);
   const bankName = (bank) =>
@@ -331,7 +328,9 @@ export default function App() {
     setVaultBusy(true);
     try {
       if (passwordMode === 'unlock') {
-        const data = normalizeWorkspace(await loadFromVault(masterPassword));
+        const data = normalizeWorkspace(
+          await loadFromVault(masterPassword, { refresh: true }),
+        );
         setWorkspace(data);
         setIsDemo(false);
         setVaultLocked(false);
@@ -359,8 +358,9 @@ export default function App() {
         setFilters(emptyFilters());
         setNotice([{ text: '已恢复加密备份' }]);
       } else if (passwordMode === 'backup') {
-        if (hasVault && !(await loadFromVault(masterPassword)))
-          throw new Error('本地库不存在，请刷新后重试');
+        // Export remains available after a conflict without rebasing this page.
+        if (hasVault)
+          await loadFromVault(masterPassword, { checkSnapshot: false });
         const payload = await encryptWorkspace(workspace, masterPassword);
         if (globalThis.cardpulseDesktop) {
           if (!(await globalThis.cardpulseDesktop.exportBackup(payload)))

@@ -38,39 +38,105 @@ async function accessVault(mode, operation) {
   }
 }
 
-export async function hasEncryptedVault() {
-  if (globalThis.cardpulseDesktop)
-    return Boolean(await globalThis.cardpulseDesktop.readVault());
-  // A storage failure must never be interpreted as an empty vault.
-  return Boolean(
-    await accessVault('readonly', (store) => store.get('vault_payload')),
-  );
+export const VAULT_CONFLICT_MESSAGE =
+  '本地库已被其他页面修改，操作已停止。当前修改仍保留，请先导出加密备份，再刷新并解锁最新数据。';
+
+function conflictError() {
+  const error = new Error(VAULT_CONFLICT_MESSAGE);
+  error.code = 'VAULT_CONFLICT';
+  return error;
 }
 
-export async function saveToVault(data, password) {
-  const payload = await encryptData(data, password);
+async function readPayload() {
   if (globalThis.cardpulseDesktop)
-    return globalThis.cardpulseDesktop.writeVault(payload);
-  await accessVault('readwrite', (store) =>
-    store.put({ id: 'vault_payload', payload, updatedAt: Date.now() }),
+    return (await globalThis.cardpulseDesktop.readVault()) || null;
+  const record = await accessVault('readonly', (store) =>
+    store.get('vault_payload'),
   );
+  return record?.payload || null;
 }
 
-export async function loadFromVault(password) {
-  const desktop = globalThis.cardpulseDesktop;
-  const record = desktop
-    ? { payload: await desktop.readVault() }
-    : await accessVault('readonly', (store) => store.get('vault_payload'));
-  if (!record?.payload) return null;
+// Compare and mutate inside one readwrite transaction. A separate read followed by
+// a write would still allow two tabs to pass the comparison simultaneously.
+async function writeBrowserPayload(expected, payload) {
+  let conflict = false;
   try {
-    return await decryptData(record.payload, password);
-  } catch {
-    throw new Error('密码不正确或数据已损坏');
+    await accessVault('readwrite', (store) => {
+      const request = store.get('vault_payload');
+      request.onsuccess = () => {
+        if ((request.result?.payload || null) !== expected) {
+          conflict = true;
+          store.transaction.abort();
+          return;
+        }
+        if (payload === null) store.delete('vault_payload');
+        else store.put({ id: 'vault_payload', payload, updatedAt: Date.now() });
+      };
+      return request;
+    });
+  } catch (error) {
+    if (conflict) throw conflictError();
+    throw error;
   }
 }
 
-export async function clearVault() {
-  if (globalThis.cardpulseDesktop)
-    return globalThis.cardpulseDesktop.clearVault();
-  await accessVault('readwrite', (store) => store.clear());
+// Each open workspace keeps its own baseline. Password verification and backup
+// export must not silently accept another tab's data as the current workspace.
+export function createVaultClient() {
+  let baseline;
+  const initialize = async () => {
+    if (baseline === undefined) baseline = await readPayload();
+    return baseline;
+  };
+  const assertCurrent = (payload) => {
+    if (baseline !== undefined && payload !== baseline) throw conflictError();
+  };
+  const write = async (expected, payload) => {
+    if (globalThis.cardpulseDesktop) {
+      // Desktop already permits only one app instance per profile.
+      if ((await readPayload()) !== expected) throw conflictError();
+      if (payload === null) await globalThis.cardpulseDesktop.clearVault();
+      else await globalThis.cardpulseDesktop.writeVault(payload);
+    } else await writeBrowserPayload(expected, payload);
+    baseline = payload;
+  };
+  return {
+    async hasEncryptedVault() {
+      const payload = await readPayload();
+      if (baseline === undefined) baseline = payload;
+      return Boolean(payload);
+    },
+    async saveToVault(data, password) {
+      const expected = await initialize();
+      const payload = await encryptData(data, password);
+      await write(expected, payload);
+    },
+    async loadFromVault(
+      password,
+      { refresh = false, checkSnapshot = true } = {},
+    ) {
+      const payload = await readPayload();
+      if (!refresh && checkSnapshot) assertCurrent(payload);
+      if (!payload) {
+        if (refresh || baseline === undefined) baseline = null;
+        return null;
+      }
+      let data;
+      try {
+        data = await decryptData(payload, password);
+      } catch {
+        throw new Error('密码不正确或数据已损坏');
+      }
+      if (refresh || baseline === undefined) baseline = payload;
+      return data;
+    },
+    async clearVault() {
+      const expected = await initialize();
+      await write(expected, null);
+    },
+  };
 }
+
+// Retain the module API for storage consumers; the UI creates one client per app.
+export const { hasEncryptedVault, saveToVault, loadFromVault, clearVault } =
+  createVaultClient();

@@ -1,5 +1,7 @@
 // UI text is translated explicitly; transaction descriptions and user activity names stay untouched.
 export const traditional = {
+  '本地库已被其他页面修改，操作已停止。当前修改仍保留，请先导出加密备份，再刷新并解锁最新数据。':
+    '本機資料庫已被其他分頁修改，操作已停止。目前修改仍保留，請先匯出加密備份，再重新整理並解鎖最新資料。',
   'Pulse 计算明细': 'Pulse 計算明細',
   'Pulse 逐笔说明': 'Pulse 逐筆說明',
   人民币基础返现: '人民幣基本回贈',
