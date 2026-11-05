@@ -4,9 +4,15 @@ export const BACKUP_REMINDER_KEY = 'cardpulse.backup-reminder';
 export const REMINDER_INTERVALS = [0, 7, 14, 30];
 const DAY_MS = 86_400_000;
 const reasons = ['passwordChanged', 'restored'];
+const validRevision = (value) =>
+  typeof value === 'string' &&
+  /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    value,
+  );
 export const emptyBackupReminder = () => ({
   lastConfirmedOn: null,
   reason: null,
+  revision: null,
 });
 const sanitize = (value) => ({
   lastConfirmedOn:
@@ -15,16 +21,47 @@ const sanitize = (value) => ({
       ? value.lastConfirmedOn
       : null,
   reason: reasons.includes(value?.reason) ? value.reason : null,
+  revision: validRevision(value?.revision) ? value.revision : null,
 });
 
-export function readBackupReminder(storage) {
+// Distinguish unavailable storage from a valid empty/legacy record so a failed
+// write never makes a session-only record look like a change from another tab.
+export function readBackupReminderState(storage) {
+  let raw;
   try {
     if (storage === undefined) storage = globalThis.localStorage;
-    const value = JSON.parse(storage?.getItem(BACKUP_REMINDER_KEY) || '{}');
-    return value?.version === 1 ? sanitize(value) : emptyBackupReminder();
+    if (typeof storage?.getItem !== 'function') throw new Error('unavailable');
+    raw = storage.getItem(BACKUP_REMINDER_KEY);
   } catch {
-    return emptyBackupReminder();
+    return { available: false, record: emptyBackupReminder() };
   }
+  try {
+    const value = JSON.parse(raw || '{}');
+    return {
+      available: true,
+      record: value?.version === 1 ? sanitize(value) : emptyBackupReminder(),
+    };
+  } catch {
+    return { available: true, record: emptyBackupReminder() };
+  }
+}
+
+export function readBackupReminder(storage) {
+  return readBackupReminderState(storage).record;
+}
+
+export function createBackupReminderRecord(value) {
+  return { ...sanitize(value), revision: crypto.randomUUID() };
+}
+
+export function sameBackupReminder(left, right) {
+  const a = sanitize(left),
+    b = sanitize(right);
+  return (
+    a.lastConfirmedOn === b.lastConfirmedOn &&
+    a.reason === b.reason &&
+    a.revision === b.revision
+  );
 }
 
 export function saveBackupReminder(value, storage) {
@@ -33,7 +70,12 @@ export function saveBackupReminder(value, storage) {
     if (typeof storage?.setItem !== 'function') return false;
     storage.setItem(
       BACKUP_REMINDER_KEY,
-      JSON.stringify({ version: 1, ...sanitize(value) }),
+      JSON.stringify({
+        version: 1,
+        ...(validRevision(value?.revision)
+          ? sanitize(value)
+          : createBackupReminderRecord(value)),
+      }),
     );
     return true;
   } catch {

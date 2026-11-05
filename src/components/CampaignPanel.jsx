@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Plus, Pencil, Trash2, Gift } from 'lucide-react';
 import { BANKS, cardsFor, cardName } from '../core/banks.js';
 import {
@@ -20,9 +20,15 @@ export default function CampaignPanel({
   t,
   onSave,
   onDelete,
+  onEditingChange,
 }) {
   const [draft, setDraft] = useState(null);
   const [error, setError] = useState('');
+  const editing = Boolean(draft);
+  useEffect(() => {
+    onEditingChange?.(editing);
+    return () => onEditingChange?.(false);
+  }, [editing, onEditingChange]);
   const results = useMemo(
     () =>
       campaigns.map((campaign) => {

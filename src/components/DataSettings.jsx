@@ -6,13 +6,21 @@ export default function DataSettings({
   rateBusy,
   onApplyRate,
   onFetchRate,
+  onDraftChange,
   t,
 }) {
-  const [draft, setDraft] = useState('');
+  const [draft, setDraft] = useState(() =>
+    rateInfo.rate ? String(rateInfo.rate) : '',
+  );
   useEffect(
     () => setDraft(rateInfo.rate ? String(rateInfo.rate) : ''),
     [rateInfo.rate],
   );
+  const editing = draft !== (rateInfo.rate ? String(rateInfo.rate) : '');
+  useEffect(() => {
+    onDraftChange?.(editing);
+    return () => onDraftChange?.(false);
+  }, [editing, onDraftChange]);
   return (
     <section className="panel data-settings" aria-labelledby="offline-heading">
       <div className="section-heading">
@@ -36,7 +44,7 @@ export default function DataSettings({
         className="rate-controls"
         onSubmit={(e) => {
           e.preventDefault();
-          onApplyRate(draft);
+          if (onApplyRate(draft)) setDraft(String(Number(draft)));
         }}
       >
         <label className="field">
@@ -58,7 +66,10 @@ export default function DataSettings({
           className="btn btn-secondary"
           type="button"
           disabled={disabled}
-          onClick={onFetchRate}
+          onClick={async () => {
+            const info = await onFetchRate();
+            if (info) setDraft(String(info.rate));
+          }}
         >
           <RefreshCw size={14} />
           {t(rateBusy ? '正在获取汇率…' : '联网更新参考汇率')}

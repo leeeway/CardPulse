@@ -10,6 +10,7 @@ it('语言及配色可恢复，无效或禁用存储使用安全默认值', () =
     locale: 'zh-TW',
     theme: 'light',
     backupReminderDays: 7,
+    idleLockMinutes: 0,
   });
   assert.equal(
     readPreferences({ getItem: () => '{invalid' }, 'zh-HK').locale,
@@ -41,7 +42,26 @@ it('语言及配色可恢复，无效或禁用存储使用安全默认值', () =
     locale: 'zh-TW',
     theme: 'jade',
     backupReminderDays: 7,
+    idleLockMinutes: 0,
   });
+});
+it('自动锁定默认关闭，仅恢复明确支持的本地时限', () => {
+  assert.equal(readPreferences({ getItem: () => '{}' }).idleLockMinutes, 0);
+  for (const value of [0, 5, 15, 30, -1, 1, '5', null]) {
+    const expected = [0, 5, 15, 30].includes(value) ? value : 0;
+    let saved;
+    const storage = {
+      getItem: () => saved,
+      setItem: (_key, raw) => (saved = raw),
+    };
+    savePreferences(
+      { locale: 'zh-CN', theme: 'navy', idleLockMinutes: value },
+      storage,
+    );
+    assert.equal(readPreferences(storage).idleLockMinutes, expected);
+    saved = JSON.stringify({ idleLockMinutes: value });
+    assert.equal(readPreferences(storage).idleLockMinutes, expected);
+  }
 });
 it('翻译动态文案和诊断信息，不更改商户原始文本', () => {
   assert.equal(

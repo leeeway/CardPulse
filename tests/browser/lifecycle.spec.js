@@ -32,13 +32,11 @@ test('lock, clear and successful restore discard campaign editor drafts', async 
   );
   const button = (name) => page.getByRole('button', { name, exact: true });
   const restore = async () => {
-    await page
-      .locator('input[accept=".cardpulse"]')
-      .setInputFiles({
-        name: 'restore.cardpulse',
-        mimeType: 'application/json',
-        buffer: Buffer.from(backup),
-      });
+    await page.locator('input[accept=".cardpulse"]').setInputFiles({
+      name: 'restore.cardpulse',
+      mimeType: 'application/json',
+      buffer: Buffer.from(backup),
+    });
     await page.getByLabel('主密码', { exact: true }).fill('lifecycle-password');
     page.once('dialog', (dialog) => dialog.accept());
     await button('确认恢复').click();
@@ -55,6 +53,12 @@ test('lock, clear and successful restore discard campaign editor drafts', async 
   await expect(page.locator('input[accept=".pdf,.csv"]')).toBeEnabled();
   await restore();
   await draft('PRIVATE LOCK DRAFT');
+  page.once('dialog', (dialog) => dialog.dismiss());
+  await button('锁定保险库').click();
+  await expect(page.getByLabel('活动名称', { exact: true })).toHaveValue(
+    'PRIVATE LOCK DRAFT',
+  );
+  page.once('dialog', (dialog) => dialog.accept());
   await button('锁定保险库').click();
   await expect(page.locator('.campaign-form')).toHaveCount(0);
   await button('解锁本地库').click();
@@ -68,13 +72,11 @@ test('lock, clear and successful restore discard campaign editor drafts', async 
   await expect(page.locator('.activity-card')).toHaveCount(0);
   await expect(page.locator('.campaign-form')).toHaveCount(0);
   await draft('PRIVATE RESTORE DRAFT');
-  await page
-    .locator('input[accept=".cardpulse"]')
-    .setInputFiles({
-      name: 'restore.cardpulse',
-      mimeType: 'application/json',
-      buffer: Buffer.from(backup),
-    });
+  await page.locator('input[accept=".cardpulse"]').setInputFiles({
+    name: 'restore.cardpulse',
+    mimeType: 'application/json',
+    buffer: Buffer.from(backup),
+  });
   await page.getByLabel('主密码', { exact: true }).fill('wrong');
   await button('确认恢复').click();
   await expect(page.getByRole('alert')).toBeVisible();
@@ -95,15 +97,13 @@ test('deleting the only unsaved import returns to a clean empty workspace', asyn
 }) => {
   await page.goto('/');
   await expect(page.locator('input[accept=".pdf,.csv"]')).toBeEnabled();
-  await page
-    .locator('input[accept=".pdf,.csv"]')
-    .setInputFiles({
-      name: 'unsaved.csv',
-      mimeType: 'text/csv',
-      buffer: Buffer.from(
-        'day,description,amount,currency,direction\n2026-10-01,EXAMPLE,100.00,CNY,debit',
-      ),
-    });
+  await page.locator('input[accept=".pdf,.csv"]').setInputFiles({
+    name: 'unsaved.csv',
+    mimeType: 'text/csv',
+    buffer: Buffer.from(
+      'day,description,amount,currency,direction\n2026-10-01,EXAMPLE,100.00,CNY,debit',
+    ),
+  });
   await expect(page.locator('tbody tr')).toHaveCount(1);
   await page.getByText('查看结单与对账', { exact: false }).click();
   page.once('dialog', (dialog) => dialog.accept());

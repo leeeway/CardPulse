@@ -5,6 +5,9 @@ import {
   readBackupReminder,
   saveBackupReminder,
   emptyBackupReminder,
+  createBackupReminderRecord,
+  sameBackupReminder,
+  readBackupReminderState,
 } from '../src/core/backup-reminder.js';
 import { readPreferences, savePreferences } from '../src/core/preferences.js';
 
@@ -65,14 +68,18 @@ it('只保存已确认日期和固定状态，不写入密码、账单及路径�
     ),
     true,
   );
-  assert.deepEqual(JSON.parse(stored), {
+  const parsed = JSON.parse(stored);
+  assert.match(parsed.revision, /^[0-9a-f-]{36}$/);
+  assert.deepEqual(parsed, {
     version: 1,
     lastConfirmedOn: '2026-11-05',
     reason: 'restored',
+    revision: parsed.revision,
   });
   assert.deepEqual(readBackupReminder(storage), {
     lastConfirmedOn: '2026-11-05',
     reason: 'restored',
+    revision: parsed.revision,
   });
   for (const value of [
     '{bad',
@@ -111,4 +118,42 @@ it('提醒间隔仅接受关闭或7/14/30天，并与语言配色一同恢复', 
     );
     assert.equal(readPreferences(storage).backupReminderDays, expected);
   }
+});
+
+it('同日相同提醒状态的每次更新都有独立随机代次，兼容没有代次的旧提醒记录', () => {
+  const data = { lastConfirmedOn: '2026-11-05', reason: 'passwordChanged' };
+  const a = createBackupReminderRecord(data);
+  const b = createBackupReminderRecord(data);
+  assert.notEqual(a.revision, b.revision);
+  assert.equal(sameBackupReminder(a, b), false);
+  assert.equal(sameBackupReminder(a, { ...a }), true);
+  const legacy = readBackupReminder({
+    getItem: () => JSON.stringify({ version: 1, ...data }),
+  });
+  assert.deepEqual(legacy, { ...data, revision: null });
+  assert.equal(sameBackupReminder(legacy, a), false);
+  let stored;
+  const storage = {
+    getItem: () => stored,
+    setItem: (_key, value) => (stored = value),
+  };
+  assert.equal(saveBackupReminder(data, storage), true);
+  const first = readBackupReminder(storage);
+  assert.equal(saveBackupReminder(data, storage), true);
+  assert.equal(sameBackupReminder(first, readBackupReminder(storage)), false);
+});
+
+it('空存储与不可用存储分别标识，禁止写入不会误报另一个页面更新了提醒', () => {
+  assert.deepEqual(readBackupReminderState({ getItem: () => null }), {
+    available: true,
+    record: emptyBackupReminder(),
+  });
+  assert.deepEqual(
+    readBackupReminderState({
+      getItem() {
+        throw new Error('blocked');
+      },
+    }),
+    { available: false, record: emptyBackupReminder() },
+  );
 });

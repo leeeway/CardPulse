@@ -1,4 +1,5 @@
 import { REMINDER_INTERVALS } from './backup-reminder.js';
+import { IDLE_LOCK_MINUTES } from './idle-lock.js';
 export const LOCALES = ['zh-CN', 'zh-TW'];
 export const THEMES = ['navy', 'light', 'ruby', 'jade'];
 export function readPreferences(
@@ -9,6 +10,7 @@ export function readPreferences(
     locale: /(?:TW|HK|MO|Hant)/i.test(language) ? 'zh-TW' : 'zh-CN',
     theme: 'navy',
     backupReminderDays: 7,
+    idleLockMinutes: 0,
   };
   try {
     if (storage === undefined) storage = globalThis.localStorage;
@@ -19,6 +21,9 @@ export function readPreferences(
       backupReminderDays: REMINDER_INTERVALS.includes(value?.backupReminderDays)
         ? value.backupReminderDays
         : defaults.backupReminderDays,
+      idleLockMinutes: IDLE_LOCK_MINUTES.includes(value?.idleLockMinutes)
+        ? value.idleLockMinutes
+        : defaults.idleLockMinutes,
     };
   } catch {
     return defaults;
@@ -37,6 +42,9 @@ export function savePreferences(preferences, storage) {
         )
           ? preferences.backupReminderDays
           : 7,
+        idleLockMinutes: IDLE_LOCK_MINUTES.includes(preferences.idleLockMinutes)
+          ? preferences.idleLockMinutes
+          : 0,
       }),
     );
   } catch {

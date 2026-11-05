@@ -922,6 +922,15 @@ footer a {
   padding-top: 20px;
   border-top: 1px solid var(--border);
 }
+.idle-lock-settings {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+}
+.idle-lock-settings .field,
+.idle-lock-settings p {
+  margin-top: 12px;
+}
 .backup-reminder > p,
 .backup-confirmation {
   margin-top: 10px;

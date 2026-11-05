@@ -242,8 +242,20 @@ try {
   await page.getByRole('dialog').waitFor({ state: 'hidden' });
   assert.equal(await page.locator('tbody tr').count(), 0);
   assert.equal(await page.locator('.statement-row').count(), 0);
+  await page.clock.install({ time: new Date('2026-11-05T04:00:00Z') });
+  await page.clock.pauseAt(new Date('2026-11-05T04:00:01Z'));
+  await page.getByLabel('空闲锁定时限').selectOption('5');
+  await page.clock.fastForward(5 * 60_000);
+  await page.getByRole('button', { name: '解锁本地库', exact: true }).waitFor();
+  assert.match(await page.getByRole('status').innerText(), /已因空闲自动锁定/);
+  await page.getByRole('button', { name: '解锁本地库', exact: true }).click();
+  await page.getByLabel('主密码', { exact: true }).fill(vaultPassword);
+  await page.getByRole('button', { name: '解锁数据', exact: true }).click();
+  await page.getByRole('dialog').waitFor({ state: 'hidden' });
+  assert.equal(await page.getByLabel('空闲锁定时限').inputValue(), '5');
+  assert.equal(await page.locator('tbody tr').count(), 0);
   console.log(
-    'PASS: Electron secure origin, isolated renderer, packaged PDF worker, offline startup/import, encrypted PDF password retry, native encrypted file, manual FX persistence, backup/export/restore, native backup confirmation and cancellation, password changes and old backup compatibility, Pulse calculation explanations, transaction review history, statement deletion, reload and full application restart.',
+    'PASS: Electron secure origin, isolated renderer, packaged PDF worker, offline startup/import, encrypted PDF password retry, native encrypted file, manual FX persistence, backup/export/restore, native backup confirmation and cancellation, password changes and old backup compatibility, Pulse calculation explanations, transaction review history, statement deletion, reload, full application restart, and idle lock/unlock.',
   );
 } finally {
   if (application) await application.close();

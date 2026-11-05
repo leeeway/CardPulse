@@ -50,10 +50,12 @@ import {
 import CampaignPanel from './components/CampaignPanel.jsx';
 import useHongKongDate from './hooks/useHongKongDate.js';
 import useBackupReminder from './hooks/useBackupReminder.js';
+import useIdleLock from './hooks/useIdleLock.js';
 import BankWorkspace from './components/BankWorkspace.jsx';
 import DataSettings from './components/DataSettings.jsx';
 import VaultSettings from './components/VaultSettings.jsx';
 import BackupReminder from './components/BackupReminder.jsx';
+import IdleLockSettings from './components/IdleLockSettings.jsx';
 import ChangePasswordDialog from './components/ChangePasswordDialog.jsx';
 import PdfPasswordDialog from './components/PdfPasswordDialog.jsx';
 import {
@@ -110,6 +112,8 @@ export default function App() {
   const [importBank, setImportBank] = useState('hsbc');
   const [importCard, setImportCard] = useState('hsbc_pulse');
   const [dirty, setDirty] = useState(false);
+  const [campaignEditing, setCampaignEditing] = useState(false);
+  const [rateEditing, setRateEditing] = useState(false);
   const [notice, setNotice] = useState([]);
   const [isDemo, setIsDemo] = useState(false);
   const rateInfo = workspace.exchangeRate || { rate: null, isFallback: true };
@@ -135,6 +139,18 @@ export default function App() {
   const pdfPasswordResolver = useRef(null);
   const unavailable =
     loadingFile || vaultBusy || rateBusy || vaultLocked || !vaultReady;
+  const idleLockActive = hasVault && vaultReady && !vaultLocked && !isDemo;
+  const idleLockBlocked =
+    dirty ||
+    campaignEditing ||
+    rateEditing ||
+    showPasswordModal ||
+    showChangePassword ||
+    Boolean(reviewId) ||
+    Boolean(pdfPasswordRequest) ||
+    loadingFile ||
+    vaultBusy ||
+    rateBusy;
 
   useEffect(() => {
     document.documentElement.lang = preferences.locale;
@@ -210,6 +226,13 @@ export default function App() {
     setActiveBank('all');
     setDirty(false);
     setMasterPassword('');
+    setPasswordError('');
+    setShowPasswordModal(false);
+    setShowChangePassword(false);
+    setPendingBackup(null);
+    setCampaignEditing(false);
+    setRateEditing(false);
+    setIsDragging(false);
     setIsDemo(false);
   };
   const handleClear = async () => {
@@ -238,7 +261,7 @@ export default function App() {
   const handleLock = () => {
     if (busyRef.current) return;
     if (
-      dirty &&
+      (dirty || campaignEditing || rateEditing) &&
       !confirm(t('存在尚未保存的修改，锁定将丢弃这些修改。确认锁定？'))
     )
       return;
@@ -246,6 +269,18 @@ export default function App() {
     setVaultLocked(true);
     setNotice([{ text: '保险库已锁定' }]);
   };
+  useIdleLock({
+    minutes: preferences.idleLockMinutes,
+    active: idleLockActive,
+    blocked: idleLockBlocked,
+    onLock: () => {
+      if (!idleLockActive || idleLockBlocked || busyRef.current) return false;
+      clearMemory();
+      setVaultLocked(true);
+      setNotice([{ text: '已因空闲自动锁定保险库。' }]);
+      return true;
+    },
+  });
   const handleFiles = async (files) => {
     if (!files?.length || unavailable || busyRef.current) return;
     const selectedBank = importBank,
@@ -374,26 +409,31 @@ export default function App() {
         setFilters(emptyFilters());
         setNotice([{ text: '已恢复加密备份' }]);
       } else if (passwordMode === 'backup') {
+        const exportToken = backupReminder.beginExport();
         // Export remains available after a conflict without rebasing this page.
         if (hasVault)
           await loadFromVault(masterPassword, { checkSnapshot: false });
         const payload = await encryptWorkspace(workspace, masterPassword);
+        let reminderCurrent;
         if (globalThis.cardpulseDesktop) {
           if (!(await globalThis.cardpulseDesktop.exportBackup(payload)))
             return;
-          backupReminder.exported(true);
-        } else
+          reminderCurrent = backupReminder.exported(true, exportToken);
+        } else {
           download(
             serializeBackup(payload),
             `CardPulse-${getHongKongDate()}.cardpulse`,
             'application/json',
           );
-        if (!globalThis.cardpulseDesktop) backupReminder.exported(false);
+          reminderCurrent = backupReminder.exported(false, exportToken);
+        }
         setNotice([
           {
-            text: globalThis.cardpulseDesktop
-              ? '已导出加密备份，未保存的修改仍需保存到加密库'
-              : '已发起加密备份下载，请检查文件已保存并在保险库安全中确认。',
+            text: !reminderCurrent
+              ? '已发起备份导出，但提醒状态已变化；请核对文件并重新导出以更新提醒。'
+              : globalThis.cardpulseDesktop
+                ? '已导出加密备份，未保存的修改仍需保存到加密库'
+                : '已发起加密备份下载，请检查文件已保存并在保险库安全中确认。',
           },
         ]);
       } else {
@@ -545,6 +585,7 @@ export default function App() {
       },
     }));
     setDirty(true);
+    return true;
   };
   const refreshRate = async () => {
     if (unavailable || isDemo || busyRef.current) return;
@@ -558,6 +599,7 @@ export default function App() {
         throw new Error('汇率暂不可用');
       setWorkspace((prev) => ({ ...prev, exchangeRate: info }));
       setDirty(true);
+      return info;
     } catch {
       setNotice([{ text: '汇率暂不可用' }]);
     } finally {
@@ -734,11 +776,13 @@ export default function App() {
         </div>
       </div>
       <DataSettings
+        key={`rate-${workspaceSession}-${vaultLocked}-${isDemo}`}
         rateInfo={rateInfo}
         disabled={unavailable || isDemo}
         rateBusy={rateBusy}
         onApplyRate={applyRate}
         onFetchRate={refreshRate}
+        onDraftChange={setRateEditing}
         t={t}
       />
       <VaultSettings
@@ -747,6 +791,19 @@ export default function App() {
         onChangePassword={() => setShowChangePassword(true)}
         t={t}
       >
+        <IdleLockSettings
+          minutes={preferences.idleLockMinutes}
+          active={idleLockActive}
+          blocked={idleLockBlocked}
+          disabled={loadingFile || vaultBusy || rateBusy || !vaultReady}
+          onChange={(minutes) =>
+            setPreferences((previous) => ({
+              ...previous,
+              idleLockMinutes: minutes,
+            }))
+          }
+          t={t}
+        />
         {!isDemo && !vaultLocked && (hasVault || workspaceHasData) && (
           <BackupReminder
             reminder={backupReminder}
@@ -845,6 +902,7 @@ export default function App() {
               )
         }
         transactions={isDemo ? [] : transactions}
+        onEditingChange={setCampaignEditing}
         disabled={unavailable || isDemo}
         bankName={bankName}
         t={t}
