@@ -195,6 +195,17 @@ npm run desktop:win    # Windows x64: NSIS installer
 
 Node.js 24.12+ is recommended. Build tools need a network connection to download Electron; installed apps do not depend on those tools. Mac packages must be built on macOS. Output is written to `release/`. An inactive [desktop release workflow template](docs/desktop-release.yml) is included; GitHub `workflow` permission is required to enable native builds and Release publishing.
 
+## Main branch additions (not yet packaged): reusable campaign rules
+
+- **Copy campaigns**: Create an independent draft from an existing card. Bank, calculation settings, and last-four filtering are retained, but eligibility confirmation is cleared. Check the name, dates, and terms before saving. Existing drafts require confirmation before another add, edit, or copy replaces them.
+- **Export rules**: Export campaigns in the current bank filter, or export one rule from its card. Unapplied editor drafts are excluded.
+- **Preview imports**: Select a rules JSON file, inspect its banks, cards, dates, channels, thresholds, and caps, then confirm additions. Same-name campaigns are flagged and retained; imported campaigns always receive new IDs and the view switches to all banks. Save the vault to persist the additions.
+- **Check eligibility again**: Rule files omit last-four filters and eligibility confirmation; imports reset both. Removing a last-four filter broadens matching, so edit and verify each imported campaign before confirming eligibility. Local copies retain last-four filters but also require fresh confirmation.
+- **Review before sharing**: Files are plaintext and contain names, merchant keywords, and calculation settings. They exclude transactions, source files, passwords, and card numbers. They are not `.cardpulse` encrypted backups; inspect names and keywords before sharing.
+- Each batch supports 1–50 campaigns and a maximum of 256 KB, using `CardPulseCampaigns` version 1. Unknown fields, damaged data, or invalid rules reject the entire batch. Reading and previewing pause idle locking; cancelling the preview leaves the workspace unchanged.
+
+These additions are source-only. The current `v0.2.0` installers are unchanged; no new packages were built.
+
 ## Features in the refreshed v0.2.0 installers
 
 **Vault password changes**: Save and unlock a vault, then use the password change button in Vault security. Enter the current password, a new password, and its confirmation. Only committed data is re-encrypted locally; use the new password for subsequent unlocks and saves.
