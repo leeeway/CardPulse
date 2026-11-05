@@ -195,7 +195,7 @@ npm run desktop:win    # Windows x64: NSIS installer
 
 Node.js 24.12+ is recommended. Build tools need a network connection to download Electron; installed apps do not depend on those tools. Mac packages must be built on macOS. Output is written to `release/`. An inactive [desktop release workflow template](docs/desktop-release.yml) is included; GitHub `workflow` permission is required to enable native builds and Release publishing.
 
-## Main branch additions (not yet packaged)
+## Features in the refreshed v0.2.0 installers
 
 **Vault password changes**: Save and unlock a vault, then use the password change button in Vault security. Enter the current password, a new password, and its confirmation. Only committed data is re-encrypted locally; use the new password for subsequent unlocks and saves.
 
@@ -218,7 +218,7 @@ Node.js 24.12+ is recommended. Build tools need a network connection to download
 - Automatic locking clears the workspace, input drafts, and search state from the page while keeping the encrypted local vault and exported backups. It does not autosave, discard unsaved content, or cache passwords. Unlocking requires the password again.
 - Returning to the window or making the page visible checks whether the timeout has elapsed. Sleep and background throttling can delay timer execution; the app checks again on return. This measures inactivity in the app window, not OS-wide idle time, and does not lock the operating system.
 
-These features are available in the source only. GitHub `v0.2.0` installers do not include them; no new packages were built for this update.
+These features are included in the v0.2.0 installers refreshed on 2026-11-05. The version number and download URLs are unchanged; download again and check the updated SHA-256 manifest.
 
 ## Planned work
 
