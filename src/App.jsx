@@ -66,6 +66,7 @@ import {
   MAX_BACKUP_BYTES,
 } from './core/backup.js';
 import { isIsoDate } from './core/campaigns.js';
+import { instantiateCampaignRules } from './core/campaign-rules.js';
 
 const emptyFilters = () => ({
   search: '',
@@ -522,6 +523,24 @@ export default function App() {
       setDirty(hasVault || hasWorkspaceData(updated));
     }
   };
+  const importCampaignRules = (rules) => {
+    if (unavailable || isDemo || busyRef.current)
+      throw new Error('操作失败，请重试');
+    const added = instantiateCampaignRules(rules, campaigns);
+    const next = normalizeWorkspace({
+      ...workspace,
+      campaigns: [...campaigns, ...added],
+    });
+    setWorkspace(next);
+    setDirty(true);
+    setActiveBank('all');
+    setNotice([
+      {
+        text: '已新增 {count} 个活动，请逐个核对资格并保存到加密库。',
+        values: { count: added.length },
+      },
+    ]);
+  };
   const resolvePdfPassword = (password) => {
     const resolve = pdfPasswordResolver.current;
     pdfPasswordResolver.current = null;
@@ -903,6 +922,15 @@ export default function App() {
         }
         transactions={isDemo ? [] : transactions}
         onEditingChange={setCampaignEditing}
+        allCampaignNames={campaigns.map((campaign) => campaign.name)}
+        onImportRules={importCampaignRules}
+        onExportRules={(content) =>
+          download(
+            content,
+            `CardPulse-campaigns-${getHongKongDate()}.json`,
+            'application/json',
+          )
+        }
         disabled={unavailable || isDemo}
         bankName={bankName}
         t={t}

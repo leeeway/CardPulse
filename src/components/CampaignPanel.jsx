@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { Plus, Pencil, Trash2, Gift } from 'lucide-react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Plus, Pencil, Trash2, Gift, Copy } from 'lucide-react';
 import { BANKS, cardsFor, cardName } from '../core/banks.js';
 import {
   calculateCampaign,
@@ -10,6 +10,13 @@ import {
 import { fromScaledBigInt } from '../core/rewards.js';
 import { channelText } from '../core/i18n.js';
 import CampaignBreakdown from './CampaignBreakdown.jsx';
+import CampaignRulesPreview from './CampaignRulesPreview.jsx';
+import {
+  MAX_RULES_BYTES,
+  parseCampaignRules,
+  serializeCampaignRules,
+  copyCampaign,
+} from '../core/campaign-rules.js';
 
 export default function CampaignPanel({
   today,
@@ -21,14 +28,52 @@ export default function CampaignPanel({
   onSave,
   onDelete,
   onEditingChange,
+  onImportRules,
+  onExportRules,
+  allCampaignNames,
 }) {
   const [draft, setDraft] = useState(null);
   const [error, setError] = useState('');
-  const editing = Boolean(draft);
+  const [rules, setRules] = useState(null);
+  const [rulesError, setRulesError] = useState('');
+  const [readingRules, setReadingRules] = useState(false);
+  const rulesInput = useRef(null);
+  const readSequence = useRef(0);
+  useEffect(
+    () => () => {
+      readSequence.current++;
+    },
+    [],
+  );
+  const editing = Boolean(draft || rules || readingRules);
   useEffect(() => {
     onEditingChange?.(editing);
     return () => onEditingChange?.(false);
   }, [editing, onEditingChange]);
+  const exportRules = (values) => {
+    try {
+      onExportRules(serializeCampaignRules(values));
+      setRulesError('');
+    } catch (error) {
+      setRulesError(error.message);
+    }
+  };
+  const readRules = async (file) => {
+    if (!file || disabled || draft) return;
+    const request = ++readSequence.current;
+    setReadingRules(true);
+    setRulesError('');
+    try {
+      if (file.size > MAX_RULES_BYTES)
+        throw new Error('活动规则文件不能超过 256 KB');
+      const parsed = parseCampaignRules(await file.text());
+      if (request === readSequence.current) setRules(parsed);
+    } catch (error) {
+      if (request === readSequence.current) setRulesError(error.message);
+    } finally {
+      if (request === readSequence.current) setReadingRules(false);
+    }
+  };
   const results = useMemo(
     () =>
       campaigns.map((campaign) => {
@@ -40,7 +85,10 @@ export default function CampaignPanel({
       }),
     [campaigns, transactions, today],
   );
+  const canReplaceDraft = () =>
+    !draft || confirm(t('已有活动编辑草稿，继续将替换草稿。确认继续？'));
   const create = () => {
+    if (!canReplaceDraft()) return;
     setError('');
     setDraft({
       id: crypto.randomUUID(),
@@ -108,13 +156,66 @@ export default function CampaignPanel({
         </div>
         <button
           className="btn btn-primary"
-          disabled={disabled}
+          disabled={disabled || readingRules}
           onClick={create}
         >
           <Plus size={16} />
           {t('添加活动')}
         </button>
       </div>
+      <div className="rules-controls">
+        <input
+          ref={rulesInput}
+          type="file"
+          hidden
+          accept=".json"
+          aria-label={t('选择活动规则文件')}
+          disabled={disabled || readingRules || Boolean(draft)}
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            event.target.value = '';
+            readRules(file);
+          }}
+        />
+        <button
+          className="btn btn-secondary"
+          disabled={disabled || readingRules || Boolean(draft)}
+          onClick={() => rulesInput.current?.click()}
+        >
+          {t(readingRules ? '正在读取规则…' : '导入活动规则')}
+        </button>
+        <button
+          className="btn btn-secondary"
+          disabled={disabled || readingRules || !campaigns.length}
+          onClick={() => exportRules(campaigns)}
+        >
+          {t('导出活动规则')}
+        </button>
+      </div>
+      <p className="muted small">
+        {t(
+          '规则文件为明文，包含活动名称及商户关键词；不含交易、卡号末四位或资格确认。只导出当前银行范围内的活动，不含编辑草稿。',
+        )}
+      </p>
+      <p className="muted small">
+        {t('每次导入或导出最多 50 个活动，文件上限 256 KB。')}
+      </p>
+      {rulesError && (
+        <p className="error" role="alert">
+          {t(rulesError)}
+        </p>
+      )}
+      {rules && (
+        <CampaignRulesPreview
+          rules={rules}
+          existingNames={allCampaignNames}
+          disabled={disabled}
+          bankName={bankName}
+          t={t}
+          onImport={onImportRules}
+          onClose={() => setRules(null)}
+        />
+      )}
       <p className="notice-inline">
         {t('活动独立估算，请勿直接与其他活动或 Pulse 奖赏相加。')}
       </p>
@@ -289,8 +390,32 @@ export default function CampaignPanel({
             <div className="form-actions">
               <button
                 className="btn btn-ghost"
+                disabled={disabled || readingRules}
+                onClick={() => {
+                  if (!canReplaceDraft()) return;
+                  try {
+                    setDraft(copyCampaign(result.campaign, t('（副本）')));
+                    setError('');
+                  } catch (error) {
+                    setRulesError(error.message);
+                  }
+                }}
+              >
+                <Copy size={14} />
+                {t('复制活动')}
+              </button>
+              <button
+                className="btn btn-ghost"
+                disabled={disabled || readingRules}
+                onClick={() => exportRules([result.campaign])}
+              >
+                {t('导出此规则')}
+              </button>
+              <button
+                className="btn btn-ghost"
                 disabled={disabled}
                 onClick={() => {
+                  if (!canReplaceDraft()) return;
                   setError('');
                   setDraft({ ...result.campaign });
                 }}

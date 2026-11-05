@@ -75,6 +75,41 @@ try {
     .locator('.pulse-breakdown .explanation-table')
     .waitFor({ state: 'detached' });
 
+  await page.getByLabel('选择活动规则文件', { exact: true }).setInputFiles({
+    name: 'native-rules.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(
+      JSON.stringify({
+        format: 'CardPulseCampaigns',
+        version: 1,
+        campaigns: [
+          {
+            name: 'Native rule template',
+            bankId: 'hsbc',
+            cardId: 'hsbc_pulse',
+            currency: 'CNY',
+            startDate: '2026-01-01',
+            endDate: '2026-12-31',
+            ratePercent: '1',
+            period: 'monthly',
+            dateBasis: 'posting',
+            channel: 'any',
+            spendingCap: '',
+            rewardCap: '',
+            minSpend: '',
+            merchant: '',
+          },
+        ],
+      }),
+    ),
+  });
+  await page
+    .getByRole('dialog', { name: '预览活动规则', exact: true })
+    .waitFor();
+  assert.equal(await page.locator('.activity-card').count(), 0);
+  await page.getByRole('button', { name: '确认新增活动', exact: true }).click();
+  await page.getByRole('dialog').waitFor({ state: 'hidden' });
+  assert.match(await page.locator('.activity-card').innerText(), /未确认资格/);
   await page
     .getByLabel('参考汇率（1 HKD = CNY）', { exact: true })
     .fill('0.93');
@@ -93,6 +128,10 @@ try {
   await page.getByLabel('主密码', { exact: true }).fill(vaultPassword);
   await page.getByRole('button', { name: '解锁数据', exact: true }).click();
   await page.locator('tbody tr').first().waitFor();
+  assert.match(
+    await page.locator('.activity-card').innerText(),
+    /Native rule template/,
+  );
   assert.equal(
     await page
       .getByLabel('参考汇率（1 HKD = CNY）', { exact: true })
@@ -255,7 +294,7 @@ try {
   assert.equal(await page.getByLabel('空闲锁定时限').inputValue(), '5');
   assert.equal(await page.locator('tbody tr').count(), 0);
   console.log(
-    'PASS: Electron secure origin, isolated renderer, packaged PDF worker, offline startup/import, encrypted PDF password retry, native encrypted file, manual FX persistence, backup/export/restore, native backup confirmation and cancellation, password changes and old backup compatibility, Pulse calculation explanations, transaction review history, statement deletion, reload, full application restart, and idle lock/unlock.',
+    'PASS: Electron secure origin, isolated renderer, packaged PDF worker, offline startup/import, encrypted PDF password retry, native encrypted file, manual FX persistence, backup/export/restore, native backup confirmation and cancellation, password changes and old backup compatibility, Pulse calculation explanations, transaction review history, statement deletion, reload, full application restart, idle lock/unlock, and campaign rule imports.',
   );
 } finally {
   if (application) await application.close();

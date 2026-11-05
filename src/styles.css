@@ -561,6 +561,39 @@ input {
 .campaign-form h3 {
   margin-bottom: 16px;
 }
+.rules-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 14px 0 10px;
+}
+.modal-content.rules-preview {
+  max-width: 650px;
+}
+.rules-preview > p,
+.rule-preview {
+  margin-top: 14px;
+}
+.rule-preview {
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow-wrap: anywhere;
+}
+.rule-preview summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.rule-preview dl > div {
+  display: grid;
+  grid-template-columns: minmax(100px, 1fr) minmax(0, 2fr);
+  gap: 12px;
+  margin-top: 8px;
+  font-size: 12px;
+}
+.rule-preview dt {
+  color: var(--text-muted);
+}
 .form-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
