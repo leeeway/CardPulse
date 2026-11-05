@@ -9,6 +9,7 @@ it('语言及配色可恢复，无效或禁用存储使用安全默认值', () =
   assert.deepEqual(readPreferences(storage, 'zh-CN'), {
     locale: 'zh-TW',
     theme: 'light',
+    backupReminderDays: 7,
   });
   assert.equal(
     readPreferences({ getItem: () => '{invalid' }, 'zh-HK').locale,
@@ -36,7 +37,11 @@ it('语言及配色可恢复，无效或禁用存储使用安全默认值', () =
     { locale: 'zh-TW', theme: 'jade', transactions: ['private'] },
     { setItem: (key, value) => (saved = JSON.parse(value)) },
   );
-  assert.deepEqual(saved, { locale: 'zh-TW', theme: 'jade' });
+  assert.deepEqual(saved, {
+    locale: 'zh-TW',
+    theme: 'jade',
+    backupReminderDays: 7,
+  });
 });
 it('翻译动态文案和诊断信息，不更改商户原始文本', () => {
   assert.equal(

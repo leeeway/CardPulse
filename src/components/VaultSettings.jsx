@@ -5,6 +5,7 @@ export default function VaultSettings({
   disabled,
   hasVault,
   onChangePassword,
+  children,
   t,
 }) {
   return (
@@ -30,6 +31,7 @@ export default function VaultSettings({
       {!hasVault && (
         <p className="muted small">{t('先保存到加密库，再修改密码。')}</p>
       )}
+      {children}
     </section>
   );
 }

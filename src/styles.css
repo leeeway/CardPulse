@@ -917,6 +917,26 @@ footer a {
   width: calc(100% - 32px);
   color: var(--text-main);
 }
+.backup-reminder {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+}
+.backup-reminder > p,
+.backup-confirmation {
+  margin-top: 10px;
+}
+.backup-controls {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 16px;
+}
+.backup-controls .field {
+  flex: 1;
+  min-width: 160px;
+}
 .review-dialog::backdrop,
 .vault-dialog::backdrop {
   background: #0009;

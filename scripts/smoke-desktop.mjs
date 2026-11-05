@@ -100,6 +100,30 @@ try {
     '0.93',
   );
   const backupPath = join(profile, 'test-backup.cardpulse');
+  // Cancelling the native chooser or rejecting an unsafe path must not record a backup.
+  await application.evaluate(({ dialog }) => {
+    dialog.showSaveDialog = async () => ({ canceled: true });
+  });
+  await page.getByRole('button', { name: '导出加密备份', exact: true }).click();
+  await page.getByLabel('主密码', { exact: true }).fill(vaultPassword);
+  const exportButton = page
+    .getByRole('dialog')
+    .getByRole('button', { name: '导出加密备份', exact: true });
+  await exportButton.click();
+  await page.waitForFunction(
+    () => !document.querySelector('[role=dialog] [type=submit]').disabled,
+  );
+  assert.match(await page.locator('.backup-history').innerText(), /暂无记录/);
+  assert.equal(await page.getByRole('dialog').isVisible(), true);
+  await application.evaluate(
+    ({ dialog }, file) => {
+      dialog.showSaveDialog = async () => ({ canceled: false, filePath: file });
+    },
+    join(profile, 'vault.cardpulse'),
+  );
+  await exportButton.click();
+  await page.getByRole('alert').waitFor();
+  assert.match(await page.locator('.backup-history').innerText(), /暂无记录/);
   await application.evaluate(({ dialog }, file) => {
     dialog.showSaveDialog = async () => ({ canceled: false, filePath: file });
     dialog.showOpenDialog = async () => ({
@@ -107,14 +131,19 @@ try {
       filePaths: [file],
     });
   }, backupPath);
-  await page.getByRole('button', { name: '导出加密备份', exact: true }).click();
-  await page.getByLabel('主密码', { exact: true }).fill(vaultPassword);
-  await page
-    .getByRole('dialog')
-    .getByRole('button', { name: '导出加密备份', exact: true })
-    .click();
+  await exportButton.click();
   await page.getByRole('dialog').waitFor({ state: 'hidden' });
   assert.match(await readFile(backupPath, 'utf8'), /CardPulseVault/);
+  assert.doesNotMatch(
+    await page.locator('.backup-history').innerText(),
+    /暂无记录/,
+  );
+  assert.equal(
+    await page
+      .getByRole('button', { name: '确认文件已保存', exact: true })
+      .count(),
+    0,
+  );
   await page.evaluate(() => {
     window.confirm = () => true;
   });
@@ -130,6 +159,10 @@ try {
   await page.getByLabel('主密码', { exact: true }).fill(vaultPassword);
   await page.getByRole('button', { name: '确认恢复', exact: true }).click();
   await page.getByText('已恢复加密备份', { exact: false }).waitFor();
+  assert.match(
+    await page.locator('.backup-reminder').innerText(),
+    /已恢复备份/,
+  );
   assert.equal(await page.locator('tbody tr').count(), 1);
   await page.getByRole('button', { name: '核对交易', exact: true }).click();
   assert.equal(
@@ -154,6 +187,10 @@ try {
     .fill('updated native vault password');
   await page.getByRole('button', { name: '确认修改密码', exact: true }).click();
   await page.getByRole('dialog').waitFor({ state: 'hidden' });
+  assert.match(
+    await page.locator('.backup-reminder').innerText(),
+    /保险库密码已修改/,
+  );
   const changedPayload = parseBackup(
     await readFile(join(profile, 'vault.cardpulse'), 'utf8'),
   );
@@ -206,7 +243,7 @@ try {
   assert.equal(await page.locator('tbody tr').count(), 0);
   assert.equal(await page.locator('.statement-row').count(), 0);
   console.log(
-    'PASS: Electron secure origin, isolated renderer, packaged PDF worker, offline startup/import, encrypted PDF password retry, native encrypted file, manual FX persistence, backup/export/restore, password changes and old backup compatibility, Pulse calculation explanations, transaction review history, statement deletion, reload and full application restart.',
+    'PASS: Electron secure origin, isolated renderer, packaged PDF worker, offline startup/import, encrypted PDF password retry, native encrypted file, manual FX persistence, backup/export/restore, native backup confirmation and cancellation, password changes and old backup compatibility, Pulse calculation explanations, transaction review history, statement deletion, reload and full application restart.',
   );
 } finally {
   if (application) await application.close();

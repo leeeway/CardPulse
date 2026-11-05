@@ -49,9 +49,11 @@ import {
 } from './core/workspace.js';
 import CampaignPanel from './components/CampaignPanel.jsx';
 import useHongKongDate from './hooks/useHongKongDate.js';
+import useBackupReminder from './hooks/useBackupReminder.js';
 import BankWorkspace from './components/BankWorkspace.jsx';
 import DataSettings from './components/DataSettings.jsx';
 import VaultSettings from './components/VaultSettings.jsx';
+import BackupReminder from './components/BackupReminder.jsx';
 import ChangePasswordDialog from './components/ChangePasswordDialog.jsx';
 import PdfPasswordDialog from './components/PdfPasswordDialog.jsx';
 import {
@@ -82,6 +84,7 @@ function download(content, fileName, type) {
 
 export default function App() {
   const today = useHongKongDate();
+  const backupReminder = useBackupReminder();
   const [
     {
       saveToVault,
@@ -199,6 +202,7 @@ export default function App() {
     }
   };
   const clearMemory = () => {
+    backupReminder.dismissPending();
     setWorkspaceSession((value) => value + 1);
     setReviewId(null);
     setWorkspace(emptyWorkspace());
@@ -221,6 +225,7 @@ export default function App() {
     try {
       await clearVault();
       clearMemory();
+      backupReminder.clear();
       setHasVault(false);
       setNotice([{ text: '已清空交易及本地保险库' }]);
     } catch (error) {
@@ -357,6 +362,7 @@ export default function App() {
         )
           return;
         await saveToVault(data, masterPassword);
+        backupReminder.invalidate('restored');
         setWorkspaceSession((value) => value + 1);
         setReviewId(null);
         setWorkspace(data);
@@ -375,13 +381,21 @@ export default function App() {
         if (globalThis.cardpulseDesktop) {
           if (!(await globalThis.cardpulseDesktop.exportBackup(payload)))
             return;
+          backupReminder.exported(true);
         } else
           download(
             serializeBackup(payload),
             `CardPulse-${getHongKongDate()}.cardpulse`,
             'application/json',
           );
-        setNotice([{ text: '已导出加密备份，未保存的修改仍需保存到加密库' }]);
+        if (!globalThis.cardpulseDesktop) backupReminder.exported(false);
+        setNotice([
+          {
+            text: globalThis.cardpulseDesktop
+              ? '已导出加密备份，未保存的修改仍需保存到加密库'
+              : '已发起加密备份下载，请检查文件已保存并在保险库安全中确认。',
+          },
+        ]);
       } else {
         if (hasVault && !(await loadFromVault(masterPassword)))
           throw new Error('本地库不存在，请刷新后重试');
@@ -409,6 +423,7 @@ export default function App() {
     setVaultBusy(true);
     try {
       await changePassword(currentPassword, newPassword);
+      backupReminder.invalidate('passwordChanged');
       setNotice([
         {
           text: '保险库密码已更新，旧备份仍使用原密码。未保存的修改请使用新密码保存。',
@@ -731,7 +746,25 @@ export default function App() {
         hasVault={hasVault}
         onChangePassword={() => setShowChangePassword(true)}
         t={t}
-      />
+      >
+        {!isDemo && !vaultLocked && (hasVault || workspaceHasData) && (
+          <BackupReminder
+            reminder={backupReminder}
+            today={today}
+            interval={preferences.backupReminderDays}
+            dirty={dirty}
+            disabled={unavailable}
+            onIntervalChange={(days) =>
+              setPreferences((previous) => ({
+                ...previous,
+                backupReminderDays: days,
+              }))
+            }
+            onExport={() => openPassword('backup')}
+            t={t}
+          />
+        )}
+      </VaultSettings>
       <BankWorkspace
         selected={activeBank}
         onSelect={setActiveBank}
