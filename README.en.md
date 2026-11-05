@@ -112,7 +112,7 @@ Parser compatibility has been checked with synthetic data. More redacted real st
 
 ## Banks, appearance, and custom campaigns
 
-Use the header to switch between Simplified and Traditional Chinese, and choose Midnight Blue, Light, Ruby, or Jade. Local preferences store language, theme, and backup reminder frequency. Separate reminder metadata stores a confirmed backup date and password-change/restore reminder state, without passwords, file paths, transactions, or campaigns. Bank tiles filter the workspace. The import bank is selected separately in the upload section.
+Use the header to switch between Simplified and Traditional Chinese, and choose Midnight Blue, Light, Ruby, or Jade. Local preferences store language, theme, backup reminder frequency, and the idle-lock timeout. Separate reminder metadata stores a confirmed backup date, password-change/restore reminder state, and a random change marker, without passwords, file paths, transactions, or campaigns. Bank tiles filter the workspace. The import bank is selected separately in the upload section.
 
 ### Importing other banks
 
@@ -208,9 +208,15 @@ Node.js 24.12+ is recommended. Build tools need a network connection to download
 
 - Desktop exports record a date after the file write succeeds. Cancelled save dialogs and failed exports do not update it.
 - Browser downloads are not automatically counted as completed backups. Check that the file was saved, then confirm it in Vault security; dismiss the confirmation if the download was cancelled.
-- Password changes and restored backups prompt another export. Reminder changes in another tab dismiss pending confirmations for older downloads. Clearing the vault resets reminder records.
+- Password changes and restored backups prompt another export. Reminder changes in another tab dismiss pending confirmations for older downloads. Changes during export or before confirmation also prevent older exports from clearing newer reminders. Clearing the vault resets reminder records.
 - A confirmed date records one export, not coverage of current edits. Saving the vault does not update the backup date. Exporting a backup does not save the vault or include unapplied campaign drafts.
 - Reminder records belong to the current browser or desktop profile and are not included in `.cardpulse` backups. If local reminder storage is unavailable, exports still work and reminder records last only for the current page.
+
+**Idle locking**: Off by default. Vault security can lock the workspace after 5, 15, or 30 minutes of inactivity in this window. The setting belongs to the current browser or desktop profile and is not included in `.cardpulse` backups. Only a saved, unlocked real vault starts the timer; demo data and workspaces without a vault do not.
+
+- Unsaved edits, campaign drafts, unapplied exchange-rate input, open dialogs, and active import/export or exchange-rate tasks pause locking with a visible explanation. Data remains visible while locking is paused. Saving or cancelling edits, closing dialogs, or finishing tasks starts a new full timeout.
+- Automatic locking clears the workspace, input drafts, and search state from the page while keeping the encrypted local vault and exported backups. It does not autosave, discard unsaved content, or cache passwords. Unlocking requires the password again.
+- Returning to the window or making the page visible checks whether the timeout has elapsed. Sleep and background throttling can delay timer execution; the app checks again on return. This measures inactivity in the app window, not OS-wide idle time, and does not lock the operating system.
 
 These features are available in the source only. GitHub `v0.2.0` installers do not include them; no new packages were built for this update.
 
@@ -222,11 +228,10 @@ These features are available in the source only. GitHub `v0.2.0` installers do n
 
 These features are not implemented and are outside the current support scope. Suggested order:
 
-1. **Data protection**: design idle locking that protects unsaved edits and continue improving backup and restore workflows.
-2. **Desktop release quality**: verify installation, upgrades, and data retention after uninstall on Windows hardware, and add release signing.
-3. **Campaign models**: add tiers, points, and statement cycles; define stacking and exclusions, and link refunds across periods.
-4. **More native bank PDFs**: collect redacted fixtures and reconciliation tests before adding each adapter; retain standard CSV as the common import route.
-5. **Further extensions**: local OCR, Beancount / Ledger export, and spending strategy simulation.
+1. **Desktop release quality**: verify installation, upgrades, and data retention after uninstall on Windows hardware, and add release signing.
+2. **Campaign models**: add tiers, points, and statement cycles; define stacking and exclusions, and link refunds across periods.
+3. **More native bank PDFs**: collect redacted fixtures and reconciliation tests before adding each adapter; retain standard CSV as the common import route.
+4. **Further extensions**: local OCR, Beancount / Ledger export, and spending strategy simulation.
 
 Local vaults and encrypted backups validate data versions, record IDs, and key nested fields. Unsupported versions and damaged content are rejected before they can cause errors after restoration.
 
