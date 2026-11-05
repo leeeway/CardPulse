@@ -112,7 +112,7 @@ Parser compatibility has been checked with synthetic data. More redacted real st
 
 ## Banks, appearance, and custom campaigns
 
-Use the header to switch between Simplified and Traditional Chinese, and choose Midnight Blue, Light, Ruby, or Jade. Only language and theme preferences are stored in local preferences; transaction and campaign data are excluded. Bank tiles filter the workspace. The import bank is selected separately in the upload section.
+Use the header to switch between Simplified and Traditional Chinese, and choose Midnight Blue, Light, Ruby, or Jade. Local preferences store language, theme, and backup reminder frequency. Separate reminder metadata stores a confirmed backup date and password-change/restore reminder state, without passwords, file paths, transactions, or campaigns. Bank tiles filter the workspace. The import bank is selected separately in the upload section.
 
 ### Importing other banks
 
@@ -204,7 +204,15 @@ Node.js 24.12+ is recommended. Build tools need a network connection to download
 - Existing backups keep their original passwords. Restoring an older backup replaces the local vault with that backup’s contents and password.
 - Cancelling or closing the dialog clears its password inputs. Passwords are not written to preferences, logs, or plaintext files. Forgotten passwords cannot be recovered.
 
-This feature is available in the source only. GitHub `v0.2.0` installers do not include it; no new packages were built for this update.
+**Local backup reminders**: Vault security offers reminders every 7, 14, or 30 days, or off. Reminders use Hong Kong calendar dates and appear only while the app is open and the workspace is unlocked. No background tasks or OS notifications are created.
+
+- Desktop exports record a date after the file write succeeds. Cancelled save dialogs and failed exports do not update it.
+- Browser downloads are not automatically counted as completed backups. Check that the file was saved, then confirm it in Vault security; dismiss the confirmation if the download was cancelled.
+- Password changes and restored backups prompt another export. Reminder changes in another tab dismiss pending confirmations for older downloads. Clearing the vault resets reminder records.
+- A confirmed date records one export, not coverage of current edits. Saving the vault does not update the backup date. Exporting a backup does not save the vault or include unapplied campaign drafts.
+- Reminder records belong to the current browser or desktop profile and are not included in `.cardpulse` backups. If local reminder storage is unavailable, exports still work and reminder records last only for the current page.
+
+These features are available in the source only. GitHub `v0.2.0` installers do not include them; no new packages were built for this update.
 
 ## Planned work
 
@@ -214,7 +222,7 @@ This feature is available in the source only. GitHub `v0.2.0` installers do not 
 
 These features are not implemented and are outside the current support scope. Suggested order:
 
-1. **Data protection**: add backup reminders and idle locking that protects unsaved edits.
+1. **Data protection**: design idle locking that protects unsaved edits and continue improving backup and restore workflows.
 2. **Desktop release quality**: verify installation, upgrades, and data retention after uninstall on Windows hardware, and add release signing.
 3. **Campaign models**: add tiers, points, and statement cycles; define stacking and exclusions, and link refunds across periods.
 4. **More native bank PDFs**: collect redacted fixtures and reconciliation tests before adding each adapter; retain standard CSV as the common import route.
