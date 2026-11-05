@@ -195,6 +195,17 @@ npm run desktop:win    # Windows x64: NSIS installer
 
 Node.js 24.12+ is recommended. Build tools need a network connection to download Electron; installed apps do not depend on those tools. Mac packages must be built on macOS. Output is written to `release/`. An inactive [desktop release workflow template](docs/desktop-release.yml) is included; GitHub `workflow` permission is required to enable native builds and Release publishing.
 
+## Main branch additions (not yet packaged)
+
+**Vault password changes**: Save and unlock a vault, then use the password change button in Vault security. Enter the current password, a new password, and its confirmation. Only committed data is re-encrypted locally; use the new password for subsequent unlocks and saves.
+
+- Unsaved transactions, campaigns, exchange-rate changes, and campaign editor drafts remain in memory. They are not automatically saved by a password change; save them separately with the new password.
+- Wrong passwords, failed writes, and conflicting tabs leave the original vault intact. After a conflict, export the current workspace as an encrypted backup before unlocking the latest data.
+- Existing backups keep their original passwords. Restoring an older backup replaces the local vault with that backup’s contents and password.
+- Cancelling or closing the dialog clears its password inputs. Passwords are not written to preferences, logs, or plaintext files. Forgotten passwords cannot be recovered.
+
+This feature is available in the source only. GitHub `v0.2.0` installers do not include it; no new packages were built for this update.
+
 ## Planned work
 
 `v0.2.0` refreshes the calculation cutoff while the app stays open: it checks the Hong Kong date every 30 seconds and on window focus or page visibility changes. Pulse, custom campaigns, and transaction explanations share this date. This fix is included in the release installers.
@@ -203,7 +214,7 @@ Node.js 24.12+ is recommended. Build tools need a network connection to download
 
 These features are not implemented and are outside the current support scope. Suggested order:
 
-1. **Data protection**: add password changes, backup reminders, and idle locking that protects unsaved edits.
+1. **Data protection**: add backup reminders and idle locking that protects unsaved edits.
 2. **Desktop release quality**: verify installation, upgrades, and data retention after uninstall on Windows hardware, and add release signing.
 3. **Campaign models**: add tiers, points, and statement cycles; define stacking and exclusions, and link refunds across periods.
 4. **More native bank PDFs**: collect redacted fixtures and reconciliation tests before adding each adapter; retain standard CSV as the common import route.
