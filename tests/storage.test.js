@@ -123,3 +123,83 @@ it('其他页面删除保险库后，旧页面不能把已经删除的数据写�
   await assert.rejects(b.clearVault(), { code: 'VAULT_CONFLICT' });
   assert.equal(await a.loadFromVault('password'), null);
 });
+
+it('修改密码只重新加密已保存数据，旧备份继续使用原密码', async () => {
+  const { createVaultClient } = await import('../src/core/storage.js');
+  const { encryptWorkspace, decryptWorkspace } =
+    await import('../src/core/backup.js');
+  const { emptyWorkspace } = await import('../src/core/workspace.js');
+  const saved = {
+    ...emptyWorkspace(),
+    exchangeRate: { rate: 0.93, date: '2026-11-05', source: 'manual' },
+  };
+  const client = createVaultClient();
+  await client.saveToVault(saved, 'old password');
+  const oldBackup = await encryptWorkspace(saved, 'old password');
+  for (const [current, next, message] of [
+    ['', 'next', /当前密码/],
+    ['old password', '', /新密码/],
+    ['old password', 'old password', /相同/],
+    ['wrong', 'next', /密码不正确/],
+  ])
+    await assert.rejects(client.changePassword(current, next), message);
+  assert.deepEqual(await client.loadFromVault('old password'), saved);
+  await client.changePassword('old password', 'new password');
+  await assert.rejects(client.loadFromVault('old password'), /密码不正确/);
+  assert.deepEqual(await client.loadFromVault('new password'), saved);
+  assert.deepEqual(await decryptWorkspace(oldBackup, 'old password'), saved);
+  await assert.rejects(decryptWorkspace(oldBackup, 'new password'));
+  await client.saveToVault({ ...saved, campaigns: [] }, 'new password');
+  await client.clearVault();
+  await assert.rejects(client.changePassword('new password', 'next'), /不存在/);
+});
+
+it('改密写入失败时原密码仍可使用，重试成功后才更新基线', async () => {
+  const { createVaultClient } = await import('../src/core/storage.js');
+  const client = createVaultClient();
+  await client.saveToVault({ saved: 'original' }, 'old');
+  const originalPut = IDBObjectStore.prototype.put;
+  IDBObjectStore.prototype.put = function (...args) {
+    const request = originalPut.apply(this, args);
+    request.addEventListener('success', () => this.transaction.abort());
+    return request;
+  };
+  try {
+    await assert.rejects(client.changePassword('old', 'new'), /中止/);
+  } finally {
+    IDBObjectStore.prototype.put = originalPut;
+  }
+  assert.deepEqual(await client.loadFromVault('old'), { saved: 'original' });
+  await assert.rejects(client.loadFromVault('new'), /密码不正确/);
+  await client.changePassword('old', 'new');
+  assert.deepEqual(await client.loadFromVault('new'), { saved: 'original' });
+  await client.clearVault();
+});
+
+it('密钥派生期间其他页面保存时，改密不能覆盖新数据，重新输入旧密码也不能绕过冲突', async () => {
+  const { createVaultClient } = await import('../src/core/storage.js');
+  const a = createVaultClient();
+  const b = createVaultClient();
+  await a.saveToVault({ revision: 1 }, 'old');
+  await b.loadFromVault('old', { refresh: true });
+  const originalEncrypt = crypto.subtle.encrypt;
+  crypto.subtle.encrypt = async function (...args) {
+    crypto.subtle.encrypt = originalEncrypt;
+    const encrypted = await originalEncrypt.apply(this, args);
+    await b.saveToVault({ revision: 2 }, 'old');
+    return encrypted;
+  };
+  try {
+    await assert.rejects(a.changePassword('old', 'new'), {
+      code: 'VAULT_CONFLICT',
+    });
+  } finally {
+    crypto.subtle.encrypt = originalEncrypt;
+  }
+  await assert.rejects(a.changePassword('old', 'new'), {
+    code: 'VAULT_CONFLICT',
+  });
+  assert.deepEqual(await b.loadFromVault('old'), { revision: 2 });
+  await assert.rejects(b.loadFromVault('new'), /密码不正确/);
+  await b.clearVault();
+});

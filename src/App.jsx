@@ -51,6 +51,8 @@ import CampaignPanel from './components/CampaignPanel.jsx';
 import useHongKongDate from './hooks/useHongKongDate.js';
 import BankWorkspace from './components/BankWorkspace.jsx';
 import DataSettings from './components/DataSettings.jsx';
+import VaultSettings from './components/VaultSettings.jsx';
+import ChangePasswordDialog from './components/ChangePasswordDialog.jsx';
 import PdfPasswordDialog from './components/PdfPasswordDialog.jsx';
 import {
   encryptWorkspace,
@@ -80,8 +82,15 @@ function download(content, fileName, type) {
 
 export default function App() {
   const today = useHongKongDate();
-  const [{ saveToVault, loadFromVault, clearVault, hasEncryptedVault }] =
-    useState(createVaultClient);
+  const [
+    {
+      saveToVault,
+      loadFromVault,
+      clearVault,
+      hasEncryptedVault,
+      changePassword,
+    },
+  ] = useState(createVaultClient);
   const [preferences, setPreferences] = useState(() => readPreferences());
   const t = (text, values) => translate(preferences.locale, text, values);
   const bankName = (bank) =>
@@ -109,6 +118,7 @@ export default function App() {
   const [vaultLocked, setVaultLocked] = useState(false);
   const [hasVault, setHasVault] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [showChangePassword, setShowChangePassword] = useState(false);
   const [vaultReady, setVaultReady] = useState(false);
   const [vaultBusy, setVaultBusy] = useState(false);
   const [passwordMode, setPasswordMode] = useState('unlock');
@@ -387,6 +397,23 @@ export default function App() {
       setPendingBackup(null);
     } catch (error) {
       setPasswordError(error.message || '操作失败，请重试');
+    } finally {
+      busyRef.current = false;
+      setVaultBusy(false);
+    }
+  };
+  const handleChangePassword = async (currentPassword, newPassword) => {
+    if (unavailable || isDemo || !hasVault || busyRef.current)
+      throw new Error('操作失败，请重试');
+    busyRef.current = true;
+    setVaultBusy(true);
+    try {
+      await changePassword(currentPassword, newPassword);
+      setNotice([
+        {
+          text: '保险库密码已更新，旧备份仍使用原密码。未保存的修改请使用新密码保存。',
+        },
+      ]);
     } finally {
       busyRef.current = false;
       setVaultBusy(false);
@@ -697,6 +724,12 @@ export default function App() {
         rateBusy={rateBusy}
         onApplyRate={applyRate}
         onFetchRate={refreshRate}
+        t={t}
+      />
+      <VaultSettings
+        disabled={unavailable || isDemo}
+        hasVault={hasVault}
+        onChangePassword={() => setShowChangePassword(true)}
         t={t}
       />
       <BankWorkspace
@@ -1187,6 +1220,15 @@ export default function App() {
           GitHub <ArrowUpRight size={13} />
         </a>
       </footer>
+      {showChangePassword && (
+        <ChangePasswordDialog
+          busy={vaultBusy}
+          dirty={dirty}
+          t={t}
+          onSubmit={handleChangePassword}
+          onClose={() => setShowChangePassword(false)}
+        />
+      )}
       {showPasswordModal && (
         <div className="modal-overlay" onClick={closePassword}>
           <form

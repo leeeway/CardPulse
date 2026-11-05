@@ -4,9 +4,11 @@ import { mkdtemp, readFile, rm, mkdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { resolve, join } from 'node:path';
 import { makeEncryptedStatementPdf } from '../tests/browser/fixtures.js';
+import { parseBackup, decryptWorkspace } from '../src/core/backup.js';
 
 const profile = await mkdtemp(join(tmpdir(), 'cardpulse-desktop-'));
 let application;
+let vaultPassword = 'native vault password';
 const binary = process.env.CARDPULSE_DESKTOP_EXECUTABLE;
 const appPath = resolve('desktop/main.cjs');
 const screenshots = resolve('.qa');
@@ -78,9 +80,7 @@ try {
     .fill('0.93');
   await page.getByRole('button', { name: '应用手动汇率', exact: true }).click();
   await page.getByRole('button', { name: '保存到加密库', exact: true }).click();
-  await page
-    .getByLabel('主密码', { exact: true })
-    .fill('native vault password');
+  await page.getByLabel('主密码', { exact: true }).fill(vaultPassword);
   await page.getByRole('button', { name: '加密保存', exact: true }).click();
   await page.getByText('已加密保存到本地保险库', { exact: false }).waitFor();
   const file = await readFile(join(profile, 'vault.cardpulse'), 'utf8');
@@ -90,9 +90,7 @@ try {
   assert.deepEqual(external, []);
   await page.reload();
   await page.getByRole('button', { name: '解锁本地库', exact: true }).click();
-  await page
-    .getByLabel('主密码', { exact: true })
-    .fill('native vault password');
+  await page.getByLabel('主密码', { exact: true }).fill(vaultPassword);
   await page.getByRole('button', { name: '解锁数据', exact: true }).click();
   await page.locator('tbody tr').first().waitFor();
   assert.equal(
@@ -110,9 +108,7 @@ try {
     });
   }, backupPath);
   await page.getByRole('button', { name: '导出加密备份', exact: true }).click();
-  await page
-    .getByLabel('主密码', { exact: true })
-    .fill('native vault password');
+  await page.getByLabel('主密码', { exact: true }).fill(vaultPassword);
   await page
     .getByRole('dialog')
     .getByRole('button', { name: '导出加密备份', exact: true })
@@ -131,9 +127,7 @@ try {
   await page.getByRole('button', { name: '确认恢复', exact: true }).click();
   await page.getByRole('alert').waitFor();
   assert.equal(await page.locator('tbody tr').count(), 0);
-  await page
-    .getByLabel('主密码', { exact: true })
-    .fill('native vault password');
+  await page.getByLabel('主密码', { exact: true }).fill(vaultPassword);
   await page.getByRole('button', { name: '确认恢复', exact: true }).click();
   await page.getByText('已恢复加密备份', { exact: false }).waitFor();
   assert.equal(await page.locator('tbody tr').count(), 1);
@@ -148,6 +142,37 @@ try {
   await page.locator('.review-history summary').click();
   assert.match(await page.getByRole('dialog').innerText(), /待确认渠道/);
   await page.getByRole('button', { name: '取消', exact: true }).click();
+  await page
+    .getByRole('button', { name: '修改保险库密码', exact: true })
+    .click();
+  await page.getByLabel('当前密码', { exact: true }).fill(vaultPassword);
+  await page
+    .getByLabel('新密码', { exact: true })
+    .fill('updated native vault password');
+  await page
+    .getByLabel('确认新密码', { exact: true })
+    .fill('updated native vault password');
+  await page.getByRole('button', { name: '确认修改密码', exact: true }).click();
+  await page.getByRole('dialog').waitFor({ state: 'hidden' });
+  const changedPayload = parseBackup(
+    await readFile(join(profile, 'vault.cardpulse'), 'utf8'),
+  );
+  await assert.rejects(decryptWorkspace(changedPayload, vaultPassword));
+  const changedWorkspace = await decryptWorkspace(
+    changedPayload,
+    'updated native vault password',
+  );
+  assert.equal(changedWorkspace.transactions.length, 1);
+  assert.equal(
+    (
+      await decryptWorkspace(
+        parseBackup(await readFile(backupPath, 'utf8')),
+        vaultPassword,
+      )
+    ).transactions.length,
+    1,
+  );
+  vaultPassword = 'updated native vault password';
   await page.screenshot({
     path: join(screenshots, 'desktop-smoke.png'),
     fullPage: true,
@@ -160,9 +185,7 @@ try {
   await page.getByRole('button', { name: '解锁本地库', exact: true }).waitFor();
   assert.equal(await page.locator('tbody tr').count(), 0);
   await page.getByRole('button', { name: '解锁本地库', exact: true }).click();
-  await page
-    .getByLabel('主密码', { exact: true })
-    .fill('native vault password');
+  await page.getByLabel('主密码', { exact: true }).fill(vaultPassword);
   await page.getByRole('button', { name: '解锁数据', exact: true }).click();
   await page.locator('tbody tr').first().waitFor();
   await page.evaluate(() => {
@@ -172,22 +195,18 @@ try {
   await page.getByRole('button', { name: '删除结单', exact: true }).click();
   assert.equal(await page.locator('tbody tr').count(), 0);
   await page.getByRole('button', { name: '保存到加密库', exact: true }).click();
-  await page
-    .getByLabel('主密码', { exact: true })
-    .fill('native vault password');
+  await page.getByLabel('主密码', { exact: true }).fill(vaultPassword);
   await page.getByRole('button', { name: '加密保存', exact: true }).click();
   await page.getByRole('dialog').waitFor({ state: 'hidden' });
   await page.reload();
   await page.getByRole('button', { name: '解锁本地库', exact: true }).click();
-  await page
-    .getByLabel('主密码', { exact: true })
-    .fill('native vault password');
+  await page.getByLabel('主密码', { exact: true }).fill(vaultPassword);
   await page.getByRole('button', { name: '解锁数据', exact: true }).click();
   await page.getByRole('dialog').waitFor({ state: 'hidden' });
   assert.equal(await page.locator('tbody tr').count(), 0);
   assert.equal(await page.locator('.statement-row').count(), 0);
   console.log(
-    'PASS: Electron secure origin, isolated renderer, packaged PDF worker, offline startup/import, encrypted PDF password retry, native encrypted file, manual FX persistence, backup/export/restore, Pulse calculation explanations, transaction review history, statement deletion, reload and full application restart.',
+    'PASS: Electron secure origin, isolated renderer, packaged PDF worker, offline startup/import, encrypted PDF password retry, native encrypted file, manual FX persistence, backup/export/restore, password changes and old backup compatibility, Pulse calculation explanations, transaction review history, statement deletion, reload and full application restart.',
   );
 } finally {
   if (application) await application.close();

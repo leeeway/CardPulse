@@ -911,12 +911,14 @@ footer a {
   margin-top: 6px;
 }
 
-.review-dialog {
+.review-dialog,
+.vault-dialog {
   margin: auto;
   width: calc(100% - 32px);
   color: var(--text-main);
 }
-.review-dialog::backdrop {
+.review-dialog::backdrop,
+.vault-dialog::backdrop {
   background: #0009;
 }
 .review-description,

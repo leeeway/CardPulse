@@ -98,3 +98,43 @@ it('本地文件仅保留密文，原子覆盖、读取和缺失数据行为正�
     await rm(directory, { recursive: true, force: true });
   }
 });
+
+it('桌面改密写入失败后保留原密文和密码，成功后沿用相同本地文件', async () => {
+  const { createVaultClient } = await import('../src/core/storage.js');
+  const directory = await mkdtemp(join(tmpdir(), 'cardpulse-rekey-'));
+  const previousBridge = globalThis.cardpulseDesktop;
+  const file = join(directory, 'vault.cardpulse');
+  let failWrite = false;
+  try {
+    globalThis.cardpulseDesktop = {
+      readVault: () => readVault(file),
+      writeVault: (payload) => {
+        if (failWrite) throw new Error('synthetic disk failure');
+        return writeVault(file, payload);
+      },
+    };
+    const client = createVaultClient();
+    const saved = emptyWorkspace();
+    await client.saveToVault(saved, 'old password');
+    const original = await readFile(file, 'utf8');
+    failWrite = true;
+    await assert.rejects(
+      client.changePassword('old password', 'new password'),
+      /disk failure/,
+    );
+    assert.equal(await readFile(file, 'utf8'), original);
+    assert.deepEqual(await client.loadFromVault('old password'), saved);
+    failWrite = false;
+    await client.changePassword('old password', 'new password');
+    await assert.rejects(client.loadFromVault('old password'), /密码不正确/);
+    assert.deepEqual(await client.loadFromVault('new password'), saved);
+    const raw = await readFile(file, 'utf8');
+    assert.ok(!raw.includes('new password'));
+    assert.ok(!raw.includes('transactions'));
+    assert.deepEqual(await readdir(directory), ['vault.cardpulse']);
+  } finally {
+    if (previousBridge === undefined) delete globalThis.cardpulseDesktop;
+    else globalThis.cardpulseDesktop = previousBridge;
+    await rm(directory, { recursive: true, force: true });
+  }
+});

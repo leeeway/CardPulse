@@ -111,6 +111,25 @@ export function createVaultClient() {
       const payload = await encryptData(data, password);
       await write(expected, payload);
     },
+    async changePassword(currentPassword, newPassword) {
+      if (!currentPassword) throw new Error('请输入当前密码');
+      if (!newPassword) throw new Error('请输入新密码');
+      if (newPassword === currentPassword)
+        throw new Error('新密码不能与当前密码相同');
+      const expected = await initialize();
+      if ((await readPayload()) !== expected) throw conflictError();
+      if (!expected) throw new Error('本地库不存在，请先保存到加密库');
+      let savedData;
+      try {
+        savedData = await decryptData(expected, currentPassword);
+      } catch {
+        throw new Error('密码不正确或数据已损坏');
+      }
+      // Rekey only the committed data. Unsaved edits remain in the UI, and the
+      // final compare-and-write also catches changes during key derivation.
+      const payload = await encryptData(savedData, newPassword);
+      await write(expected, payload);
+    },
     async loadFromVault(
       password,
       { refresh = false, checkSnapshot = true } = {},
