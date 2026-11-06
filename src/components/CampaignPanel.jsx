@@ -5,6 +5,7 @@ import {
   calculateCampaign,
   validateCampaign,
   PERIODS,
+  PERIOD_LABELS,
   CHANNELS,
 } from '../core/campaigns.js';
 import { fromScaledBigInt } from '../core/rewards.js';
@@ -100,6 +101,7 @@ export default function CampaignPanel({
       endDate: `${today.slice(0, 4)}-12-31`,
       ratePercent: '',
       period: 'monthly',
+      statementDay: '',
       dateBasis: 'posting',
       channel: 'any',
       spendingCap: '',
@@ -120,7 +122,7 @@ export default function CampaignPanel({
     <label className="field">
       <span>{t(label)}</span>
       <input
-        value={draft[key]}
+        value={draft[key] ?? ''}
         onChange={(e) => change(key, e.target.value)}
         {...props}
       />
@@ -142,7 +144,6 @@ export default function CampaignPanel({
       </select>
     </label>
   );
-  const periodNames = ['整个活动', '每个自然月', '每半年', '每个自然年'];
   return (
     <section
       className="panel campaign-panel"
@@ -221,7 +222,7 @@ export default function CampaignPanel({
       </p>
       <p className="muted small">
         {t(
-          '退款按所选日期周期扣回、不释放消费或奖赏额度；跨期原单追溯、阶梯费率、积分和结单周期暂不支持。',
+          '退款按所选日期周期扣回、不释放消费或奖赏额度；跨期原单追溯、阶梯费率及积分暂不支持。',
         )}
       </p>
       {draft && !disabled && (
@@ -276,8 +277,17 @@ export default function CampaignPanel({
             {select(
               '封顶周期',
               'period',
-              PERIODS.map((value, index) => [value, t(periodNames[index])]),
+              PERIODS.map((value) => [value, t(PERIOD_LABELS[value])]),
             )}
+            {draft.period === 'statement' &&
+              field('每月结单日', 'statementDay', {
+                type: 'number',
+                min: '1',
+                max: '31',
+                step: '1',
+                required: true,
+                placeholder: t('例如：25'),
+              })}
             {field('每周期消费上限', 'spendingCap', {
               type: 'number',
               min: '0',
@@ -315,6 +325,13 @@ export default function CampaignPanel({
               placeholder: t('留空为所有商户'),
             })}
           </div>
+          {draft.period === 'statement' && (
+            <p className="notice-inline">
+              {t(
+                '结单日当天计入本周期，次日开启新周期；短月取月末。不自动调整假期或实际结单日，请核对条款。',
+              )}
+            </p>
+          )}
           <label className="checkbox-label">
             <input
               type="checkbox"
@@ -363,10 +380,9 @@ export default function CampaignPanel({
                 BANKS.find((bank) => bank.id === result.campaign.bankId),
               )}{' '}
               · {result.campaign.ratePercent}% ·{' '}
-              {t(
-                periodNames[PERIODS.indexOf(result.campaign.period)] ||
-                  '整个活动',
-              )}
+              {t(PERIOD_LABELS[result.campaign.period] || '整个活动')}
+              {result.campaign.period === 'statement' &&
+                ` · ${t('每月 {day} 日结单', { day: result.campaign.statementDay })}`}
             </p>
             {result.error ? (
               <p className="error">{t(result.error)}</p>

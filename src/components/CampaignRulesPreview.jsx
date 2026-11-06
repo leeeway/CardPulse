@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { BANKS, cardName } from '../core/banks.js';
 import { channelText } from '../core/i18n.js';
+import { PERIOD_LABELS } from '../core/campaigns.js';
 
 export default function CampaignRulesPreview({
   rules,
@@ -18,12 +19,6 @@ export default function CampaignRulesPreview({
     dialog.showModal();
     return () => dialog.close();
   }, []);
-  const periods = {
-    campaign: '整个活动',
-    monthly: '每个自然月',
-    halfYear: '每半年',
-    yearly: '每个自然年',
-  };
   return (
     <dialog
       ref={ref}
@@ -81,7 +76,10 @@ export default function CampaignRulesPreview({
                 ['起始日期', rule.startDate],
                 ['结束日期', rule.endDate],
                 ['回赠比例（%）', rule.ratePercent],
-                ['封顶周期', t(periods[rule.period])],
+                ['封顶周期', t(PERIOD_LABELS[rule.period])],
+                ...(rule.period === 'statement'
+                  ? [['每月结单日', rule.statementDay]]
+                  : []),
                 ['每周期消费上限', rule.spendingCap || t('不限')],
                 ['每周期奖赏上限', rule.rewardCap || t('不限')],
                 ['每周期净消费门槛', rule.minSpend || '0'],
@@ -98,6 +96,13 @@ export default function CampaignRulesPreview({
                 </div>
               ))}
             </dl>
+            {rule.period === 'statement' && (
+              <p className="notice-inline">
+                {t(
+                  '结单日当天计入本周期，次日开启新周期；短月取月末。不自动调整假期或实际结单日，请核对条款。',
+                )}
+              </p>
+            )}
           </details>
         ))}
       </div>

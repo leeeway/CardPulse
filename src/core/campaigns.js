@@ -2,7 +2,14 @@ import { cents } from './reconciliation.js';
 import { toScaledBigInt, getHongKongDate } from './rewards.js';
 import { getBank, bankOf, cardsFor } from './banks.js';
 
-export const PERIODS = ['campaign', 'monthly', 'halfYear', 'yearly'];
+export const PERIOD_LABELS = {
+  campaign: '整个活动',
+  monthly: '每个自然月',
+  halfYear: '每半年',
+  yearly: '每个自然年',
+  statement: '自定义结单周期',
+};
+export const PERIODS = Object.keys(PERIOD_LABELS);
 export const CHANNELS = [
   'any',
   'standard',
@@ -53,6 +60,12 @@ export function validateCampaign(value) {
     !['posting', 'transaction'].includes(value.dateBasis)
   )
     throw new Error('请选择有效的计算周期');
+  if (
+    value.period === 'statement' &&
+    (!['string', 'number'].includes(typeof value.statementDay) ||
+      !/^(?:[1-9]|[12]\d|3[01])$/.test(String(value.statementDay)))
+  )
+    throw new Error('结单日须为 1 至 31 的整数');
   if (!CHANNELS.includes(value.channel))
     throw new Error('请选择有效的支付渠道');
   if (
@@ -81,7 +94,27 @@ export function validateCampaign(value) {
     registrationConfirmed: value.registrationConfirmed === true,
   };
 }
-function periodKey(day, period) {
+function closingDate(monthIndex, closingDay) {
+  const year = Math.floor(monthIndex / 12);
+  const month = monthIndex - year * 12 + 1;
+  const leap = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+  const days = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  return `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-${String(Math.min(closingDay, days[month - 1])).padStart(2, '0')}`;
+}
+
+function periodKey(day, { period, statementDay }) {
+  if (period === 'statement') {
+    const month = Number(day.slice(0, 4)) * 12 + Number(day.slice(5, 7)) - 1;
+    // The closing day belongs to the ending cycle; short months close on their last day.
+    const endMonth =
+      day <= closingDate(month, statementDay) ? month : month + 1;
+    const previousClose = closingDate(endMonth - 1, statementDay);
+    const start =
+      previousClose === closingDate(endMonth - 1, 31)
+        ? closingDate(endMonth, 1)
+        : closingDate(endMonth - 1, Number(previousClose.slice(-2)) + 1);
+    return `${start} → ${closingDate(endMonth, statementDay)}`;
+  }
   if (period === 'monthly') return day.slice(0, 7);
   if (period === 'yearly') return day.slice(0, 4);
   if (period === 'halfYear')
@@ -219,7 +252,7 @@ function matchTransaction(tx, campaign, today) {
     included: true,
     reason: tx.direction === 'credit' ? 'refund' : 'spend',
     day,
-    period: periodKey(day, campaign.period),
+    period: periodKey(day, campaign),
   };
 }
 

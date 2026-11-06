@@ -5,7 +5,7 @@ import {
   validateCampaign,
   explainCampaignTransactions,
 } from '../src/core/campaigns.js';
-import { fromScaledBigInt } from '../src/core/rewards.js';
+import { fromScaledBigInt, toScaledBigInt } from '../src/core/rewards.js';
 
 const campaign = (patch) => ({
   id: 'c1',
@@ -27,6 +27,7 @@ const campaign = (patch) => ({
   registrationConfirmed: true,
   ...patch,
 });
+
 const tx = (amount, patch = {}) => ({
   id: crypto.randomUUID(),
   bankId: 'bochk',
@@ -45,6 +46,171 @@ const tx = (amount, patch = {}) => ({
 const calculate = (transactions, patch = {}) =>
   calculateCampaign(transactions, campaign(patch), { today: '2026-12-31' });
 
+describe('自定义结单周期', () => {
+  it('结单当日属于旧周期，次日重置封顶，跨年周期保持连续', () => {
+    const result = calculateCampaign(
+      [
+        tx('2000', { day: '2025-12-26' }),
+        tx('2000', { day: '2026-01-25' }),
+        tx('2000', { day: '2026-01-26' }),
+        tx('2000', { day: '2026-02-25' }),
+      ],
+      campaign({
+        period: 'statement',
+        statementDay: '25',
+        startDate: '2025-12-01',
+      }),
+      { today: '2026-12-31' },
+    );
+    assert.deepEqual(
+      result.periods.map((p) => p.key),
+      ['2025-12-26 → 2026-01-25', '2026-01-26 → 2026-02-25'],
+    );
+    assert.equal(fromScaledBigInt(result.cashback), '50.00');
+    assert.ok(
+      result.periods.every(
+        (p) => fromScaledBigInt(p.gross) === '4000.00' && p.remaining === 0n,
+      ),
+    );
+  });
+
+  it('29、30、31 日按短月月末结单，正确处理闰年及世纪年', () => {
+    for (const year of [1900, 2000, 2024, 2026, 2100]) {
+      const leap = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+      const last = leap ? '29' : '28';
+      for (const statementDay of [29, 30, 31]) {
+        const days = [
+          `${year}-02-${last}`,
+          `${year}-03-01`,
+          `${year}-03-${statementDay}`,
+          `${year}-03-${statementDay < 31 ? String(statementDay + 1) : '31'}`,
+        ];
+        const input = campaign({
+          period: 'statement',
+          statementDay,
+          startDate: `${year}-01-01`,
+          endDate: `${year}-12-31`,
+        });
+        const explanations = explainCampaignTransactions(
+          days.map((day) => tx('100', { day })),
+          input,
+          { today: `${year}-12-31` },
+        );
+        assert.ok(explanations[0].period.endsWith(`→ ${year}-02-${last}`));
+        assert.equal(
+          explanations[1].period,
+          `${year}-03-01 → ${year}-03-${statementDay}`,
+        );
+        assert.equal(explanations[2].period, explanations[1].period);
+        if (statementDay < 31)
+          assert.ok(
+            explanations[3].period.endsWith(
+              `→ ${year}-04-${Math.min(statementDay, 30)}`,
+            ),
+          );
+      }
+    }
+  });
+
+  it('1 日结单、交易日口径、活动边界与截止日均不被周期范围扩大', () => {
+    const input = campaign({
+      period: 'statement',
+      statementDay: '1',
+      startDate: '2026-01-20',
+      endDate: '2026-02-02',
+      dateBasis: 'transaction',
+      minSpend: '100',
+      spendingCap: '',
+    });
+    const transactions = [
+      tx('9999', { transactionDay: '2026-01-19' }),
+      tx('60', { transactionDay: '2026-01-20' }),
+      tx('40', { transactionDay: '2026-02-01' }),
+      tx('100', { transactionDay: '2026-02-02' }),
+      tx('9999', { transactionDay: '2026-02-03' }),
+    ];
+    const result = calculateCampaign(transactions, input, {
+      today: '2026-02-01',
+    });
+    assert.equal(result.matchedCount, 2);
+    assert.equal(result.periods[0].key, '2026-01-02 → 2026-02-01');
+    assert.equal(fromScaledBigInt(result.cashback), '2.50');
+    const later = calculateCampaign(transactions, input, {
+      today: '2026-12-31',
+    });
+    assert.equal(later.matchedCount, 3);
+    assert.equal(later.periods[1].key, '2026-02-02 → 2026-03-01');
+    assert.equal(fromScaledBigInt(later.cashback), '5.00');
+  });
+
+  it('退款只扣所处周期，不追溯上一周期、不回补封顶；逐笔说明与汇总一致', () => {
+    const input = campaign({
+      period: 'statement',
+      statementDay: '25',
+      spendingCap: '',
+      rewardCap: '20',
+    });
+    const transactions = [
+      tx('2000', { day: '2026-01-25' }),
+      tx('2000', { day: '2026-01-26' }),
+      tx('100', { day: '2026-02-25', direction: 'credit', category: 'credit' }),
+      tx('100', { day: '2026-02-26', direction: 'credit', category: 'credit' }),
+    ];
+    const result = calculateCampaign(transactions, input, {
+      today: '2026-12-31',
+    });
+    assert.deepEqual(
+      result.periods.map((p) => fromScaledBigInt(p.cashback)),
+      ['20.00', '17.50', '0.00'],
+    );
+    const entries = explainCampaignTransactions(transactions, input, {
+      today: '2026-12-31',
+    });
+    for (const p of result.periods) {
+      const entriesInPeriod = entries.filter((entry) => entry.period === p.key);
+      assert.equal(
+        entriesInPeriod.reduce(
+          (sum, entry) =>
+            sum +
+            (entry.reason === 'spend'
+              ? toScaledBigInt(entry.transaction.amount)
+              : 0n),
+          0n,
+        ),
+        p.gross,
+      );
+    }
+  });
+
+  it('仅接受明确的 1–31 整数，旧周期无须新增字段', () => {
+    for (const statementDay of [
+      undefined,
+      null,
+      '',
+      '0',
+      32,
+      -1,
+      2.5,
+      true,
+      {},
+      [],
+      '01',
+      '1e1',
+      ' 25',
+    ])
+      assert.throws(
+        () => validateCampaign(campaign({ period: 'statement', statementDay })),
+        /结单日/,
+      );
+    for (const statementDay of [1, '15', 31])
+      assert.equal(
+        validateCampaign(campaign({ period: 'statement', statementDay }))
+          .statementDay,
+        statementDay,
+      );
+    assert.equal(validateCampaign(campaign()).period, 'monthly');
+  });
+});
 describe('自定义活动精确计算', () => {
   it('按银行、币种、卡片、卡号、渠道及商户筛选', () => {
     const transactions = [

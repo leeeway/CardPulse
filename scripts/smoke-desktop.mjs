@@ -81,7 +81,7 @@ try {
     buffer: Buffer.from(
       JSON.stringify({
         format: 'CardPulseCampaigns',
-        version: 1,
+        version: 2,
         campaigns: [
           {
             name: 'Native rule template',
@@ -91,7 +91,8 @@ try {
             startDate: '2026-01-01',
             endDate: '2026-12-31',
             ratePercent: '1',
-            period: 'monthly',
+            period: 'statement',
+            statementDay: '25',
             dateBasis: 'posting',
             channel: 'any',
             spendingCap: '',
@@ -132,6 +133,15 @@ try {
     await page.locator('.activity-card').innerText(),
     /Native rule template/,
   );
+  await page.getByRole('button', { name: '编辑活动', exact: true }).click();
+  assert.equal(
+    await page.getByLabel('每月结单日', { exact: true }).inputValue(),
+    '25',
+  );
+  await page
+    .locator('.campaign-form')
+    .getByRole('button', { name: '取消', exact: true })
+    .click();
   assert.equal(
     await page
       .getByLabel('参考汇率（1 HKD = CNY）', { exact: true })

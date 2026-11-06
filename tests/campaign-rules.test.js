@@ -104,7 +104,7 @@ it('未知版本、未知字段、恶意字段类型及损坏的批次整体拒�
   for (const value of [
     '{bad',
     'null',
-    wrap([rule], { version: 2 }),
+    wrap([rule], { version: 3 }),
     wrap([rule], { transactions: [] }),
     wrap([{ ...rule, id: 'overwrite' }]),
     wrap([{ ...rule, last4: '1234' }]),
@@ -121,6 +121,26 @@ it('未知版本、未知字段、恶意字段类型及损坏的批次整体拒�
       wrap([rule]).replace('"name":', '"__proto__":{},"name":'),
     ),
   );
+});
+
+it('结单周期通过第 2 版共享及复制，旧规则仍导出第 1 版；错误结单配置整批拒绝', () => {
+  const original = campaign({ period: 'statement', statementDay: '31' });
+  const content = serializeCampaignRules([campaign(), original]);
+  assert.equal(JSON.parse(content).version, 2);
+  const rules = parseCampaignRules(content);
+  assert.equal(rules[1].statementDay, '31');
+  assert.equal(copyCampaign(original, '（副本）').statementDay, '31');
+  assert.equal(instantiateCampaignRules(rules)[1].statementDay, '31');
+  assert.equal(JSON.parse(serializeCampaignRules([campaign()])).version, 1);
+  assert.ok(!Object.hasOwn(rules[0], 'statementDay'));
+  for (const value of [
+    wrap(rules),
+    wrap([{ ...rules[0], statementDay: '25' }], { version: 2 }),
+    wrap([{ ...rules[1], statementDay: false }], { version: 2 }),
+    wrap([rules[0], { ...rules[1], statementDay: '32' }], { version: 2 }),
+    wrap([{ ...rules[1], statementDay: undefined }], { version: 2 }),
+  ])
+    assert.throws(() => parseCampaignRules(value));
 });
 
 it('文件字节数与批次数量边界被校验，数字配置规范化且空上限仍保持不限', () => {

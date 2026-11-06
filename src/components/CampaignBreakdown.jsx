@@ -30,6 +30,13 @@ export default function CampaignBreakdown({ result, transactions, t }) {
               : '按记账日期',
           )}
         </p>
+        {result.campaign.period === 'statement' && (
+          <p className="notice-inline">
+            {t(
+              '周期显示完整起止日；仅计入活动日期范围及估算截止日内的交易。首尾周期可能不完整，门槛及封顶不按天折算。',
+            )}
+          </p>
+        )}
         {result.periods.length === 0 && (
           <p className="muted small">
             {t(

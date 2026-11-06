@@ -49,15 +49,21 @@ function projectRule(value) {
   }
   const valid = validateCampaign({
     ...selected,
+    ...(value.period === 'statement'
+      ? { statementDay: value.statementDay }
+      : {}),
     last4: '',
     registrationConfirmed: false,
   });
-  return Object.fromEntries(
+  const projected = Object.fromEntries(
     fields.map((field) => [
       field,
       numericFields.includes(field) ? String(valid[field]) : valid[field],
     ]),
   );
+  if (valid.period === 'statement')
+    projected.statementDay = String(valid.statementDay);
+  return projected;
 }
 
 function checkCount(rules) {
@@ -67,12 +73,13 @@ function checkCount(rules) {
 
 export function serializeCampaignRules(campaigns) {
   checkCount(campaigns);
+  const rules = campaigns.map(projectRule);
   // Explicit projection prevents extra workspace fields from leaking into a shared file.
   const content = JSON.stringify(
     {
       format: 'CardPulseCampaigns',
-      version: 1,
-      campaigns: campaigns.map(projectRule),
+      version: rules.some((rule) => rule.period === 'statement') ? 2 : 1,
+      campaigns: rules,
     },
     null,
     2,
@@ -97,7 +104,7 @@ export function parseCampaignRules(content) {
   if (
     !record(data) ||
     data.format !== 'CardPulseCampaigns' ||
-    data.version !== 1
+    ![1, 2].includes(data.version)
   )
     throw new Error('活动规则格式或版本不受支持');
   if (
@@ -110,9 +117,17 @@ export function parseCampaignRules(content) {
   return data.campaigns.map((value) => {
     if (
       !record(value) ||
-      Object.keys(value).some((key) => !fields.includes(key))
+      Object.keys(value).some(
+        (key) =>
+          !fields.includes(key) &&
+          !(data.version === 2 && key === 'statementDay'),
+      )
     )
       throw new Error('活动规则包含不支持的字段');
+    if (data.version === 1 && value.period === 'statement')
+      throw new Error('结单周期规则须使用第 2 版规则文件');
+    if (value.period !== 'statement' && Object.hasOwn(value, 'statementDay'))
+      throw new Error('仅结单周期可设置结单日');
     return projectRule(value);
   });
 }

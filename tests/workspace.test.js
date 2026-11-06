@@ -151,3 +151,19 @@ it('加密正确但内容损坏的备份在恢复前被拒绝；有效嵌套信�
   );
   await assert.rejects(decryptWorkspace(corrupt, 'password'), /格式无效/);
 });
+
+it('结单周期配置经加密备份完整恢复，损坏结单日不会进入工作区', async () => {
+  const data = normalizeWorkspace({
+    ...workspace(),
+    campaigns: [{ ...campaign(), period: 'statement', statementDay: '31' }],
+  });
+  assert.deepEqual(
+    await decryptWorkspace(await encryptData(data, 'password'), 'password'),
+    data,
+  );
+  const corrupt = await encryptData(
+    { ...data, campaigns: [{ ...data.campaigns[0], statementDay: '32' }] },
+    'password',
+  );
+  await assert.rejects(decryptWorkspace(corrupt, 'password'), /结单日/);
+});
