@@ -138,7 +138,7 @@ Select Add campaign and configure the bank, card or last four digits, currency, 
 
 **Custom campaign explanations:** Expand the period estimate to inspect gross spending, refunds, net spending, thresholds, spending caps, remaining allowances, rewards before/after capping, and applied refund clawbacks. Expand transaction explanations to see inclusion or the first exclusion reason, filter included/excluded records, and page through 25 records at a time. Explanations share the calculation's matching logic. Caps remain period aggregates rather than per-transaction rewards. Uncertain channels retain a warning; displayed rounding can cause small component differences. Explanations are derived in memory without changing the encrypted workspace schema. These features are included starting with `v0.2.0-beta.3`.
 
-**Extension assessment:** Flat rates, caps, calendar periods, and thresholds fit a shared configuration model and are implemented. Points/miles conversion, tiered rates, statement cycles, cross-period refund matching, shared principal/supplementary allowances, and stacking need dedicated models. Native bank PDFs also need layout fixtures and reconciliation checks. For example, the [official Standard Chartered Smart page](https://www.sc.com/hk/credit-cards/smart/) describes statement-cycle spending, which cannot be replaced with calendar months. Bank links provide official references for manual checking, not verified reward presets.
+**Extension assessment:** Flat rates, caps, calendar periods, and thresholds fit a shared configuration model and are implemented. The main branch now supports custom cycles with a fixed closing day (not yet packaged; see below). Points/miles conversion, tiered rates, actual closing-date adjustments, cross-period refund matching, shared principal/supplementary allowances, and stacking need dedicated models. Native bank PDFs also need layout fixtures and reconciliation checks. For example, the [official Standard Chartered Smart page](https://www.sc.com/hk/credit-cards/smart/) describes statement-cycle spending, which cannot be replaced with calendar months. Bank links provide official references for manual checking, not verified reward presets.
 
 ## Privacy and data
 
@@ -195,14 +195,26 @@ npm run desktop:win    # Windows x64: NSIS installer
 
 Node.js 24.12+ is recommended. Build tools need a network connection to download Electron; installed apps do not depend on those tools. Mac packages must be built on macOS. Output is written to `release/`. An inactive [desktop release workflow template](docs/desktop-release.yml) is included; GitHub `workflow` permission is required to enable native builds and Release publishing.
 
-## Main branch additions (not yet packaged): reusable campaign rules
+## Main branch additions (not yet packaged): statement cycles and reusable campaign rules
+
+### Custom statement cycles
+
+Choose the custom statement cycle period and enter a monthly closing day from 1 to 31. With day 25, January 26 through February 25 is one cycle; the next starts February 26. Spending caps, reward caps, and minimum net spending reset per cycle.
+
+- The closing day belongs to the ending cycle. Short months close on their last day, including leap years. With day 31, a non-leap February closes on February 28 and the next cycle starts March 1.
+- Period breakdowns and transaction explanations show full cycle boundaries, but only include transactions within campaign dates and the current estimate cutoff. First and last cycles may be incomplete; thresholds and caps retain their configured amounts without prorating.
+- Posting or transaction dates determine the cycle. Refunds reduce rewards in their own cycle, without linking to the original purchase or replenishing capped allowances.
+- This is a user-configured fixed-date estimate. It does not extract actual statement periods or adjust for holidays, closing-date changes, or bank-specific arrangements. Check the applicable terms; configure separate campaigns for cards with different closing days.
+- The closing day survives copying, rule sharing, encrypted saving, and backups. Vaults or backups containing the new period require an app with this feature; older installers reject them. Keep a pre-upgrade backup.
+
+### Reusable campaign rules
 
 - **Copy campaigns**: Create an independent draft from an existing card. Bank, calculation settings, and last-four filtering are retained, but eligibility confirmation is cleared. Check the name, dates, and terms before saving. Existing drafts require confirmation before another add, edit, or copy replaces them.
 - **Export rules**: Export campaigns in the current bank filter, or export one rule from its card. Unapplied editor drafts are excluded.
 - **Preview imports**: Select a rules JSON file, inspect its banks, cards, dates, channels, thresholds, and caps, then confirm additions. Same-name campaigns are flagged and retained; imported campaigns always receive new IDs and the view switches to all banks. Save the vault to persist the additions.
 - **Check eligibility again**: Rule files omit last-four filters and eligibility confirmation; imports reset both. Removing a last-four filter broadens matching, so edit and verify each imported campaign before confirming eligibility. Local copies retain last-four filters but also require fresh confirmation.
 - **Review before sharing**: Files are plaintext and contain names, merchant keywords, and calculation settings. They exclude transactions, source files, passwords, and card numbers. They are not `.cardpulse` encrypted backups; inspect names and keywords before sharing.
-- Each batch supports 1–50 campaigns and a maximum of 256 KB, using `CardPulseCampaigns` version 1. Unknown fields, damaged data, or invalid rules reject the entire batch. Reading and previewing pause idle locking; cancelling the preview leaves the workspace unchanged.
+- Each batch supports 1–50 campaigns and a maximum of 256 KB, using `CardPulseCampaigns` version 1 or 2. Ordinary rules still export as version 1; batches containing statement cycles use version 2, which older apps cannot import. Unknown fields, damaged data, or invalid rules reject the entire batch. Reading and previewing pause idle locking; cancelling the preview leaves the workspace unchanged.
 
 These additions are source-only. The current `v0.2.0` installers are unchanged; no new packages were built.
 
@@ -240,7 +252,7 @@ These features are included in the v0.2.0 installers refreshed on 2026-11-05. Th
 These features are not implemented and are outside the current support scope. Suggested order:
 
 1. **Desktop release quality**: verify installation, upgrades, and data retention after uninstall on Windows hardware, and add release signing.
-2. **Campaign models**: add tiers, points, and statement cycles; define stacking and exclusions, and link refunds across periods.
+2. **Campaign models**: add tiers, points, and actual closing-date adjustments; define stacking and exclusions, and link refunds across periods.
 3. **More native bank PDFs**: collect redacted fixtures and reconciliation tests before adding each adapter; retain standard CSV as the common import route.
 4. **Further extensions**: local OCR, Beancount / Ledger export, and spending strategy simulation.
 
