@@ -12,6 +12,7 @@ import { fromScaledBigInt } from '../core/rewards.js';
 import { channelText } from '../core/i18n.js';
 import CampaignBreakdown from './CampaignBreakdown.jsx';
 import CampaignRulesPreview from './CampaignRulesPreview.jsx';
+import { campaignStatus, filterCampaigns } from '../core/campaign-list.js';
 import {
   MAX_RULES_BYTES,
   parseCampaignRules,
@@ -34,6 +35,12 @@ export default function CampaignPanel({
   allCampaignNames,
 }) {
   const [draft, setDraft] = useState(null);
+  const [query, setQuery] = useState('');
+  const [status, setStatus] = useState('all');
+  const listedCampaigns = useMemo(
+    () => filterCampaigns(campaigns, { query, status, today }),
+    [campaigns, query, status, today],
+  );
   const [error, setError] = useState('');
   const [rules, setRules] = useState(null);
   const [rulesError, setRulesError] = useState('');
@@ -361,100 +368,170 @@ export default function CampaignPanel({
           </div>
         </form>
       )}
+      <div className="form-grid">
+        <label className="field">
+          <span>{t('搜索活动')}</span>
+          <input
+            type="search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder={t('活动名称或商户关键词')}
+          />
+        </label>
+        <label className="field">
+          <span>{t('活动状态')}</span>
+          <select
+            aria-label={t('活动状态')}
+            value={status}
+            onChange={(event) => setStatus(event.target.value)}
+          >
+            {Object.entries({
+              all: '全部活动',
+              active: '进行中',
+              upcoming: '未开始',
+              ended: '已结束',
+              unconfirmed: '待确认资格',
+            }).map(([value, label]) => (
+              <option key={value} value={value}>
+                {t(label)}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+      <p className="muted small" aria-live="polite">
+        {t('显示 {shown} / {total} 个活动', {
+          shown: listedCampaigns.length,
+          total: campaigns.length,
+        })}
+      </p>
+      <p className="muted small">
+        {t(
+          '活动搜索和状态仅筛选卡片，不改变计算或规则导出范围；日期状态按香港日期判断，与资格确认独立。',
+        )}
+      </p>
+      {campaigns.length > 0 && listedCampaigns.length === 0 && (
+        <div className="empty-activities">
+          <span>{t('没有符合筛选的活动')}</span>
+          <button
+            type="button"
+            className="btn btn-ghost"
+            onClick={() => {
+              setQuery('');
+              setStatus('all');
+            }}
+          >
+            {t('重置活动筛选')}
+          </button>
+        </div>
+      )}
       <div className="campaign-grid">
-        {results.map((result) => (
-          <article className="activity-card" key={result.campaign.id}>
-            <div className="activity-top">
-              <Gift size={18} />
+        {results
+          .filter((result) =>
+            listedCampaigns.some(
+              (campaign) => campaign.id === result.campaign.id,
+            ),
+          )
+          .map((result) => (
+            <article className="activity-card" key={result.campaign.id}>
+              <div className="activity-top">
+                <Gift size={18} />
+                <span className="badge-tag">
+                  {t(
+                    result.campaign.registrationConfirmed
+                      ? '已确认资格'
+                      : '未确认资格，不计算奖赏',
+                  )}
+                </span>
+              </div>
+              <h3>{result.campaign.name}</h3>
               <span className="badge-tag">
                 {t(
-                  result.campaign.registrationConfirmed
-                    ? '已确认资格'
-                    : '未确认资格，不计算奖赏',
+                  { active: '进行中', upcoming: '未开始', ended: '已结束' }[
+                    campaignStatus(result.campaign, today)
+                  ],
                 )}
               </span>
-            </div>
-            <h3>{result.campaign.name}</h3>
-            <p className="muted small">
-              {bankName(
-                BANKS.find((bank) => bank.id === result.campaign.bankId),
-              )}{' '}
-              · {result.campaign.ratePercent}% ·{' '}
-              {t(PERIOD_LABELS[result.campaign.period] || '整个活动')}
-              {result.campaign.period === 'statement' &&
-                ` · ${t('每月 {day} 日结单', { day: result.campaign.statementDay })}`}
-            </p>
-            {result.error ? (
-              <p className="error">{t(result.error)}</p>
-            ) : (
-              <>
-                <div className="reward-card-value">
-                  <small>{result.campaign.currency}</small>
-                  {fromScaledBigInt(result.cashback)}
-                </div>
-                <p className="muted small">
-                  {result.campaign.startDate} → {result.campaign.endDate} ·{' '}
-                  {t('匹配 {count} 笔', { count: result.matchedCount })}
-                </p>
-                <CampaignBreakdown
-                  result={result}
-                  transactions={transactions}
-                  t={t}
-                />
-              </>
-            )}
-            <div className="form-actions">
-              <button
-                className="btn btn-ghost"
-                disabled={disabled || readingRules}
-                onClick={() => {
-                  if (!canReplaceDraft()) return;
-                  try {
-                    setDraft(copyCampaign(result.campaign, t('（副本）')));
+              <p className="muted small">
+                {bankName(
+                  BANKS.find((bank) => bank.id === result.campaign.bankId),
+                )}{' '}
+                · {result.campaign.ratePercent}% ·{' '}
+                {t(PERIOD_LABELS[result.campaign.period] || '整个活动')}
+                {result.campaign.period === 'statement' &&
+                  ` · ${t('每月 {day} 日结单', { day: result.campaign.statementDay })}`}
+              </p>
+              {result.error ? (
+                <p className="error">{t(result.error)}</p>
+              ) : (
+                <>
+                  <div className="reward-card-value">
+                    <small>{result.campaign.currency}</small>
+                    {fromScaledBigInt(result.cashback)}
+                  </div>
+                  <p className="muted small">
+                    {result.campaign.startDate} → {result.campaign.endDate} ·{' '}
+                    {t('匹配 {count} 笔', { count: result.matchedCount })}
+                  </p>
+                  <CampaignBreakdown
+                    result={result}
+                    transactions={transactions}
+                    t={t}
+                  />
+                </>
+              )}
+              <div className="form-actions">
+                <button
+                  className="btn btn-ghost"
+                  disabled={disabled || readingRules}
+                  onClick={() => {
+                    if (!canReplaceDraft()) return;
+                    try {
+                      setDraft(copyCampaign(result.campaign, t('（副本）')));
+                      setError('');
+                    } catch (error) {
+                      setRulesError(error.message);
+                    }
+                  }}
+                >
+                  <Copy size={14} />
+                  {t('复制活动')}
+                </button>
+                <button
+                  className="btn btn-ghost"
+                  disabled={disabled || readingRules}
+                  onClick={() => exportRules([result.campaign])}
+                >
+                  {t('导出此规则')}
+                </button>
+                <button
+                  className="btn btn-ghost"
+                  disabled={disabled}
+                  onClick={() => {
+                    if (!canReplaceDraft()) return;
                     setError('');
-                  } catch (error) {
-                    setRulesError(error.message);
-                  }
-                }}
-              >
-                <Copy size={14} />
-                {t('复制活动')}
-              </button>
-              <button
-                className="btn btn-ghost"
-                disabled={disabled || readingRules}
-                onClick={() => exportRules([result.campaign])}
-              >
-                {t('导出此规则')}
-              </button>
-              <button
-                className="btn btn-ghost"
-                disabled={disabled}
-                onClick={() => {
-                  if (!canReplaceDraft()) return;
-                  setError('');
-                  setDraft({ ...result.campaign });
-                }}
-              >
-                <Pencil size={14} />
-                {t('编辑活动')}
-              </button>
-              <button
-                className="btn btn-ghost"
-                disabled={disabled}
-                onClick={() => {
-                  if (confirm(t('确认删除这个活动？'))) {
-                    onDelete(result.campaign.id);
-                    if (draft?.id === result.campaign.id) setDraft(null);
-                  }
-                }}
-              >
-                <Trash2 size={14} />
-                {t('删除活动')}
-              </button>
-            </div>
-          </article>
-        ))}
+                    setDraft({ ...result.campaign });
+                  }}
+                >
+                  <Pencil size={14} />
+                  {t('编辑活动')}
+                </button>
+                <button
+                  className="btn btn-ghost"
+                  disabled={disabled}
+                  onClick={() => {
+                    if (confirm(t('确认删除这个活动？'))) {
+                      onDelete(result.campaign.id);
+                      if (draft?.id === result.campaign.id) setDraft(null);
+                    }
+                  }}
+                >
+                  <Trash2 size={14} />
+                  {t('删除活动')}
+                </button>
+              </div>
+            </article>
+          ))}
       </div>
       {!campaigns.length && !draft && (
         <div className="empty-activities">

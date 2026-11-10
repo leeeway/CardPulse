@@ -117,6 +117,15 @@ export default function App() {
   const [rateEditing, setRateEditing] = useState(false);
   const [notice, setNotice] = useState([]);
   const [isDemo, setIsDemo] = useState(false);
+  const visibleCampaigns = useMemo(
+    () =>
+      isDemo
+        ? []
+        : campaigns.filter(
+            (c) => activeBank === 'all' || c.bankId === activeBank,
+          ),
+    [campaigns, activeBank, isDemo],
+  );
   const rateInfo = workspace.exchangeRate || { rate: null, isFallback: true };
   const [rateBusy, setRateBusy] = useState(false);
   const [pendingBackup, setPendingBackup] = useState(null);
@@ -913,13 +922,7 @@ export default function App() {
       <CampaignPanel
         key={`${workspaceSession}-${vaultLocked}-${isDemo}`}
         today={today}
-        campaigns={
-          isDemo
-            ? []
-            : campaigns.filter(
-                (c) => activeBank === 'all' || c.bankId === activeBank,
-              )
-        }
+        campaigns={visibleCampaigns}
         transactions={isDemo ? [] : transactions}
         onEditingChange={setCampaignEditing}
         allCampaignNames={campaigns.map((campaign) => campaign.name)}
