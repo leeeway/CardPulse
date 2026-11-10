@@ -197,6 +197,12 @@ Node.js 24.12+ is recommended. Build tools need a network connection to download
 
 ## Main branch additions (not yet packaged): statement cycles and reusable campaign rules
 
+### Campaign management
+
+Search campaign names or merchant keywords and filter active, upcoming, ended, or unconfirmed campaigns. Date status follows the Hong Kong date, includes both boundary dates, and is independent of eligibility. Search combines with status and bank filters; an empty result offers a reset button.
+
+These filters affect campaign cards only. Calculations and rule exports retain their scope: export includes every campaign in the selected bank scope. Filtering neither deletes campaigns nor discards editor drafts. Locking or reloading resets list filters. Transaction searches and theme changes no longer repeatedly trigger campaign aggregate calculations.
+
 ### Custom statement cycles
 
 Choose the custom statement cycle period and enter a monthly closing day from 1 to 31. With day 25, January 26 through February 25 is one cycle; the next starts February 26. Spending caps, reward caps, and minimum net spending reset per cycle.
