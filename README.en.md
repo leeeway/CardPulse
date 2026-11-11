@@ -138,7 +138,7 @@ Select Add campaign and configure the bank, card or last four digits, currency, 
 
 **Custom campaign explanations:** Expand the period estimate to inspect gross spending, refunds, net spending, thresholds, spending caps, remaining allowances, rewards before/after capping, and applied refund clawbacks. Expand transaction explanations to see inclusion or the first exclusion reason, filter included/excluded records, and page through 25 records at a time. Explanations share the calculation's matching logic. Caps remain period aggregates rather than per-transaction rewards. Uncertain channels retain a warning; displayed rounding can cause small component differences. Explanations are derived in memory without changing the encrypted workspace schema. These features are included starting with `v0.2.0-beta.3`.
 
-**Extension assessment:** Flat rates, caps, calendar periods, and thresholds fit a shared configuration model and are implemented. The main branch now supports progressive marginal rates and custom cycles with a fixed closing day (not yet packaged; see below). Points/miles conversion, whole-spend rate upgrades after reaching a threshold, actual closing-date adjustments, cross-period refund matching, shared principal/supplementary allowances, and stacking need dedicated models. Native bank PDFs also need layout fixtures and reconciliation checks. For example, the [official Standard Chartered Smart page](https://www.sc.com/hk/credit-cards/smart/) describes statement-cycle spending, which cannot be replaced with calendar months. Bank links provide official references for manual checking, not verified reward presets.
+**Extension assessment:** Flat rates, caps, calendar periods, and thresholds fit a shared configuration model and are implemented. The refreshed installers now support progressive marginal rates and custom cycles with a fixed closing day (see below). Points/miles conversion, whole-spend rate upgrades after reaching a threshold, actual closing-date adjustments, cross-period refund matching, shared principal/supplementary allowances, and stacking need dedicated models. Native bank PDFs also need layout fixtures and reconciliation checks. For example, the [official Standard Chartered Smart page](https://www.sc.com/hk/credit-cards/smart/) describes statement-cycle spending, which cannot be replaced with calendar months. Bank links provide official references for manual checking, not verified reward presets.
 
 ## Privacy and data
 
@@ -195,7 +195,11 @@ npm run desktop:win    # Windows x64: NSIS installer
 
 Node.js 24.12+ is recommended. Build tools need a network connection to download Electron; installed apps do not depend on those tools. Mac packages must be built on macOS. Output is written to `release/`. An inactive [desktop release workflow template](docs/desktop-release.yml) is included; GitHub `workflow` permission is required to enable native builds and Release publishing.
 
-## Main branch additions (not yet packaged): progressive rates, statement cycles, and campaign management
+## Refreshed v0.2.0: progressive rates, statement cycles, and campaign management
+
+### Filtering transaction explanations
+
+Pulse and custom campaign explanations combine inclusion status, a specific reason, and merchant-description search. Reason options show total counts; filtered results use 25 rows per page and offer a reset button. Corrections update results immediately. A selected reason remains selected even if its count drops to zero. These filters affect only the explanation table, leaving rewards, the transaction table, and exports unchanged.
 
 ### Campaign spending scenarios
 
@@ -249,7 +253,7 @@ Choose the custom statement cycle period and enter a monthly closing day from 1 
 - **Review before sharing**: Files are plaintext and contain names, merchant keywords, and calculation settings. They exclude transactions, source files, passwords, and card numbers. They are not `.cardpulse` encrypted backups; inspect names and keywords before sharing.
 - Each batch supports 1–50 campaigns and a maximum of 256 KB, using `CardPulseCampaigns` versions 1–3. Flat-rate calendar rules still use version 1, flat-rate statement cycles use version 2, and batches containing progressive rules use version 3. Older apps reject unsupported versions. Unknown fields, damaged data, or invalid rules reject the entire batch. Reading and previewing pause idle locking; cancelling the preview leaves the workspace unchanged.
 
-These additions are source-only. The current `v0.2.0` installers are unchanged; no new packages were built.
+These features are included in the refreshed `v0.2.0` installers. Version numbers and download URLs are unchanged. Download again and verify the current `SHA256SUMS.txt`.
 
 ## Features in the refreshed v0.2.0 installers
 
@@ -274,7 +278,7 @@ These additions are source-only. The current `v0.2.0` installers are unchanged; 
 - Automatic locking clears the workspace, input drafts, and search state from the page while keeping the encrypted local vault and exported backups. It does not autosave, discard unsaved content, or cache passwords. Unlocking requires the password again.
 - Returning to the window or making the page visible checks whether the timeout has elapsed. Sleep and background throttling can delay timer execution; the app checks again on return. This measures inactivity in the app window, not OS-wide idle time, and does not lock the operating system.
 
-These features are included in the v0.2.0 installers refreshed on 2026-11-05. The version number and download URLs are unchanged; download again and check the updated SHA-256 manifest.
+These features are included in the v0.2.0 installers refreshed on 2026-11-11. The version number and download URLs are unchanged; download again and check the updated SHA-256 manifest.
 
 ## Planned work
 
