@@ -1,9 +1,21 @@
 import assert from 'node:assert/strict';
-import { readFile, access } from 'node:fs/promises';
+import { readFile, access, readdir } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { join } from 'node:path';
 import { listPackage, extractFile } from '@electron/asar';
 const { version } = JSON.parse(await readFile('package.json', 'utf8'));
+const sourceHashes = new Map();
+const digest = (buffer) => createHash('sha256').update(buffer).digest('hex');
+async function hashTree(directory) {
+  for (const entry of await readdir(directory, { withFileTypes: true })) {
+    const path = `${directory}/${entry.name}`;
+    if (entry.isDirectory()) await hashTree(path);
+    else sourceHashes.set(path, digest(await readFile(path)));
+  }
+}
+await hashTree('dist');
+await hashTree('desktop');
 async function find(paths) {
   for (const path of paths) {
     try {
@@ -40,6 +52,14 @@ async function verifyArchive(file) {
     extractFile(file, 'dist/index.html').toString(),
     await readFile('dist/index.html', 'utf8'),
   );
+  for (const [path, hash] of sourceHashes) {
+    assert(entries.includes(`/${path}`), `${file}: missing ${path}`);
+    assert.equal(
+      digest(extractFile(file, path)),
+      hash,
+      `${file}: source mismatch in ${path}`,
+    );
+  }
 }
 function run(command, args) {
   const result = spawnSync(command, args, {
