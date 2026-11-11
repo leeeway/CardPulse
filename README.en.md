@@ -138,7 +138,7 @@ Select Add campaign and configure the bank, card or last four digits, currency, 
 
 **Custom campaign explanations:** Expand the period estimate to inspect gross spending, refunds, net spending, thresholds, spending caps, remaining allowances, rewards before/after capping, and applied refund clawbacks. Expand transaction explanations to see inclusion or the first exclusion reason, filter included/excluded records, and page through 25 records at a time. Explanations share the calculation's matching logic. Caps remain period aggregates rather than per-transaction rewards. Uncertain channels retain a warning; displayed rounding can cause small component differences. Explanations are derived in memory without changing the encrypted workspace schema. These features are included starting with `v0.2.0-beta.3`.
 
-**Extension assessment:** Flat rates, caps, calendar periods, and thresholds fit a shared configuration model and are implemented. The main branch now supports custom cycles with a fixed closing day (not yet packaged; see below). Points/miles conversion, tiered rates, actual closing-date adjustments, cross-period refund matching, shared principal/supplementary allowances, and stacking need dedicated models. Native bank PDFs also need layout fixtures and reconciliation checks. For example, the [official Standard Chartered Smart page](https://www.sc.com/hk/credit-cards/smart/) describes statement-cycle spending, which cannot be replaced with calendar months. Bank links provide official references for manual checking, not verified reward presets.
+**Extension assessment:** Flat rates, caps, calendar periods, and thresholds fit a shared configuration model and are implemented. The main branch now supports progressive marginal rates and custom cycles with a fixed closing day (not yet packaged; see below). Points/miles conversion, whole-spend rate upgrades after reaching a threshold, actual closing-date adjustments, cross-period refund matching, shared principal/supplementary allowances, and stacking need dedicated models. Native bank PDFs also need layout fixtures and reconciliation checks. For example, the [official Standard Chartered Smart page](https://www.sc.com/hk/credit-cards/smart/) describes statement-cycle spending, which cannot be replaced with calendar months. Bank links provide official references for manual checking, not verified reward presets.
 
 ## Privacy and data
 
@@ -195,7 +195,19 @@ npm run desktop:win    # Windows x64: NSIS installer
 
 Node.js 24.12+ is recommended. Build tools need a network connection to download Electron; installed apps do not depend on those tools. Mac packages must be built on macOS. Output is written to `release/`. An inactive [desktop release workflow template](docs/desktop-release.yml) is included; GitHub `workflow` permission is required to enable native builds and Release publishing.
 
-## Main branch additions (not yet packaged): statement cycles and reusable campaign rules
+## Main branch additions (not yet packaged): progressive rates, statement cycles, and campaign management
+
+### Progressive marginal rates
+
+Choose progressive rates under the reward calculation method and configure 2–8 bands. The first starts at zero, subsequent starting amounts must increase strictly, and the final band is unlimited. Amounts and percentage rates accept two decimal places. Rates may range from 0% to 100%, with at least one positive band. Switching methods clears rate settings and eligibility confirmation for rechecking.
+
+For example, 1% on the first 1,000 and 3% on the remainder produces `1,000 × 1% + 500 × 3% = 25` on spending of 1,500. Bands reset with the chosen calendar or statement cycle. Period details show spending and rewards per band; the CSV report includes the full configuration. Copying, rule sharing, encrypted saving, and restoring preserve bands; copies and imports require fresh eligibility confirmation.
+
+**Caps and refunds:** Apply the spending cap, calculate marginal rewards, then apply the reward cap. Same-period refunds remove the highest occupied bands from capped eligible spending, without tracing original purchases or replenishing allowances. With gross spending of 2,000, a spending cap of 1,500, a reward cap of 20, and refunds of 600, band rewards are 25; the clawback is `25 − 900 × 1% = 16`; the estimate is `20 − 16 = 4`. Minimum net spending still uses uncapped gross spending minus refunds; failure makes the entire period reward zero.
+
+This is a **marginal-band** model. It does not implement whole-spend rate upgrades, per-transaction bands, points, or campaign stacking. Rules are user-configured from applicable terms, not official bank presets. Calculations use fixed-point integers; displayed band rounding can differ slightly from the total.
+
+Workspaces and encrypted backups containing progressive campaigns use internal data version 3, which older apps reject. Flat-rate-only workspaces retain version 2. Encryption, passwords, and file extensions are unchanged. Keep a pre-upgrade backup and open new data with an app supporting this model.
 
 ### Reward reconciliation reports
 
@@ -226,7 +238,7 @@ Choose the custom statement cycle period and enter a monthly closing day from 1 
 - **Preview imports**: Select a rules JSON file, inspect its banks, cards, dates, channels, thresholds, and caps, then confirm additions. Same-name campaigns are flagged and retained; imported campaigns always receive new IDs and the view switches to all banks. Save the vault to persist the additions.
 - **Check eligibility again**: Rule files omit last-four filters and eligibility confirmation; imports reset both. Removing a last-four filter broadens matching, so edit and verify each imported campaign before confirming eligibility. Local copies retain last-four filters but also require fresh confirmation.
 - **Review before sharing**: Files are plaintext and contain names, merchant keywords, and calculation settings. They exclude transactions, source files, passwords, and card numbers. They are not `.cardpulse` encrypted backups; inspect names and keywords before sharing.
-- Each batch supports 1–50 campaigns and a maximum of 256 KB, using `CardPulseCampaigns` version 1 or 2. Ordinary rules still export as version 1; batches containing statement cycles use version 2, which older apps cannot import. Unknown fields, damaged data, or invalid rules reject the entire batch. Reading and previewing pause idle locking; cancelling the preview leaves the workspace unchanged.
+- Each batch supports 1–50 campaigns and a maximum of 256 KB, using `CardPulseCampaigns` versions 1–3. Flat-rate calendar rules still use version 1, flat-rate statement cycles use version 2, and batches containing progressive rules use version 3. Older apps reject unsupported versions. Unknown fields, damaged data, or invalid rules reject the entire batch. Reading and previewing pause idle locking; cancelling the preview leaves the workspace unchanged.
 
 These additions are source-only. The current `v0.2.0` installers are unchanged; no new packages were built.
 
@@ -264,7 +276,7 @@ These features are included in the v0.2.0 installers refreshed on 2026-11-05. Th
 These features are not implemented and are outside the current support scope. Suggested order:
 
 1. **Desktop release quality**: verify installation, upgrades, and data retention after uninstall on Windows hardware, and add release signing.
-2. **Campaign models**: add tiers, points, and actual closing-date adjustments; define stacking and exclusions, and link refunds across periods.
+2. **Campaign models**: add whole-spend rate upgrades, points, and actual closing-date adjustments; define stacking and exclusions, and link refunds across periods.
 3. **More native bank PDFs**: collect redacted fixtures and reconciliation tests before adding each adapter; retain standard CSV as the common import route.
 4. **Further extensions**: local OCR, Beancount / Ledger export, and spending strategy simulation.
 
