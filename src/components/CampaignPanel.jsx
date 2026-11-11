@@ -12,6 +12,8 @@ import { fromScaledBigInt } from '../core/rewards.js';
 import { channelText } from '../core/i18n.js';
 import CampaignBreakdown from './CampaignBreakdown.jsx';
 import CampaignRulesPreview from './CampaignRulesPreview.jsx';
+import CampaignTierEditor from './CampaignTierEditor.jsx';
+import { isProgressive } from '../core/campaign-tiers.js';
 import { exportCampaignReport } from '../core/campaign-report.js';
 import { campaignStatus, filterCampaigns } from '../core/campaign-list.js';
 import {
@@ -109,6 +111,7 @@ export default function CampaignPanel({
       startDate: `${today.slice(0, 4)}-01-01`,
       endDate: `${today.slice(0, 4)}-12-31`,
       ratePercent: '',
+      rewardType: 'flat',
       period: 'monthly',
       statementDay: '',
       dateBasis: 'posting',
@@ -126,6 +129,19 @@ export default function CampaignPanel({
       ...prev,
       [field]: value,
       ...(field === 'bankId' ? { cardId: '' } : {}),
+      ...(field === 'rewardType'
+        ? {
+            ratePercent: value === 'progressive' ? '0' : '',
+            tiers:
+              value === 'progressive'
+                ? [
+                    { from: '0', ratePercent: '' },
+                    { from: '', ratePercent: '' },
+                  ]
+                : undefined,
+            registrationConfirmed: false,
+          }
+        : {}),
     }));
   const field = (label, key, props = {}) => (
     <label className="field">
@@ -142,7 +158,7 @@ export default function CampaignPanel({
       <span>{t(label)}</span>
       <select
         aria-label={t(label)}
-        value={draft[key]}
+        value={draft[key] ?? (key === 'rewardType' ? 'flat' : '')}
         onChange={(e) => change(key, e.target.value)}
       >
         {options.map(([value, label]) => (
@@ -231,7 +247,7 @@ export default function CampaignPanel({
       </p>
       <p className="muted small">
         {t(
-          '退款按所选日期周期扣回、不释放消费或奖赏额度；跨期原单追溯、阶梯费率及积分暂不支持。',
+          '退款按所选日期周期扣回、不释放消费或奖赏额度；跨期原单追溯及积分暂不支持。',
         )}
       </p>
       {draft && !disabled && (
@@ -276,13 +292,18 @@ export default function CampaignPanel({
             ])}
             {field('起始日期', 'startDate', { type: 'date', required: true })}
             {field('结束日期', 'endDate', { type: 'date', required: true })}
-            {field('回赠比例（%）', 'ratePercent', {
-              type: 'number',
-              min: '0.01',
-              max: '100',
-              step: '0.01',
-              required: true,
-            })}
+            {select('奖赏计算方式', 'rewardType', [
+              ['flat', t('固定费率')],
+              ['progressive', t('分段累进费率')],
+            ])}
+            {!isProgressive(draft) &&
+              field('回赠比例（%）', 'ratePercent', {
+                type: 'number',
+                min: '0.01',
+                max: '100',
+                step: '0.01',
+                required: true,
+              })}
             {select(
               '封顶周期',
               'period',
@@ -334,6 +355,13 @@ export default function CampaignPanel({
               placeholder: t('留空为所有商户'),
             })}
           </div>
+          {isProgressive(draft) && (
+            <CampaignTierEditor
+              tiers={draft.tiers}
+              onChange={(tiers) => change('tiers', tiers)}
+              t={t}
+            />
+          )}
           {draft.period === 'statement' && (
             <p className="notice-inline">
               {t(
@@ -458,8 +486,11 @@ export default function CampaignPanel({
                 {bankName(
                   BANKS.find((bank) => bank.id === result.campaign.bankId),
                 )}{' '}
-                · {result.campaign.ratePercent}% ·{' '}
-                {t(PERIOD_LABELS[result.campaign.period] || '整个活动')}
+                ·{' '}
+                {isProgressive(result.campaign)
+                  ? t('分段累进费率')
+                  : `${result.campaign.ratePercent}%`}{' '}
+                · {t(PERIOD_LABELS[result.campaign.period] || '整个活动')}
                 {result.campaign.period === 'statement' &&
                   ` · ${t('每月 {day} 日结单', { day: result.campaign.statementDay })}`}
               </p>

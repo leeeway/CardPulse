@@ -1,6 +1,11 @@
 import { cents } from './reconciliation.js';
 import { toScaledBigInt, getHongKongDate } from './rewards.js';
 import { getBank, bankOf, cardsFor } from './banks.js';
+import {
+  isProgressive,
+  validateTiers,
+  calculateTierReward,
+} from './campaign-tiers.js';
 
 export const PERIOD_LABELS = {
   campaign: '整个活动',
@@ -74,9 +79,23 @@ export function validateCampaign(value) {
       (value.last4 !== '' && !/^\d{4}$/.test(value.last4)))
   )
     throw new Error('卡号末四位须为 4 位数字');
-  const rate = cents(value.ratePercent);
-  if (rate <= 0n || rate > 10000n)
-    throw new Error('回赠比例须大于 0 且不超过 100%');
+  if (
+    value.rewardType != null &&
+    !['flat', 'progressive'].includes(value.rewardType)
+  )
+    throw new Error('奖赏计算方式不受支持');
+  let tiers;
+  if (isProgressive(value)) {
+    // A zero flat rate makes older engines reject this model instead of silently using a fallback.
+    if (String(value.ratePercent) !== '0')
+      throw new Error('分段活动的固定费率须为 0');
+    tiers = validateTiers(value.tiers);
+  } else {
+    if (value.tiers != null) throw new Error('固定费率活动不能包含分段配置');
+    const rate = cents(value.ratePercent);
+    if (rate <= 0n || rate > 10000n)
+      throw new Error('回赠比例须大于 0 且不超过 100%');
+  }
   for (const field of ['spendingCap', 'rewardCap', 'minSpend']) {
     if (value[field] !== '' && value[field] != null && cents(value[field]) < 0n)
       throw new Error('额度和门槛不能为负数');
@@ -88,6 +107,7 @@ export function validateCampaign(value) {
     throw new Error('商户关键词过长');
   return {
     ...value,
+    ...(tiers ? { tiers } : {}),
     name: value.name.trim(),
     ratePercent: String(value.ratePercent),
     merchant: (value.merchant || '').trim(),
@@ -124,7 +144,7 @@ function periodKey(day, { period, statementDay }) {
 const min = (a, b) => (a < b ? a : b);
 const positive = (value) => (value > 0n ? value : 0n);
 
-/** Independent flat-rate cash estimates; no cross-campaign stacking or inferred eligibility. */
+/** Independent cash estimates; no cross-campaign stacking or inferred eligibility. */
 export function calculateCampaign(
   transactions,
   input,
@@ -161,8 +181,19 @@ export function calculateCampaign(
     .sort((a, b) => a.key.localeCompare(b.key))
     .map((pool) => {
       const used = cap === null ? pool.gross : min(pool.gross, cap);
-      const beforeRefund = (used * rate) / 10000n;
-      const clawback = min(beforeRefund, (pool.refunds * rate) / 10000n);
+      const tierCalculation = isProgressive(campaign)
+        ? calculateTierReward(used, campaign.tiers)
+        : null;
+      const beforeRefund = tierCalculation
+        ? tierCalculation.reward
+        : (used * rate) / 10000n;
+      // Progressive refunds remove the highest occupied bands from capped eligible spending.
+      // The original used amount (and hence remaining allowance) never changes.
+      const clawback = tierCalculation
+        ? beforeRefund -
+          calculateTierReward(positive(used - pool.refunds), campaign.tiers)
+            .reward
+        : min(beforeRefund, (pool.refunds * rate) / 10000n);
       const netSpend = positive(pool.gross - pool.refunds);
       const thresholdMet = netSpend >= threshold;
       const uncappedReward = thresholdMet ? beforeRefund - clawback : 0n;
@@ -174,6 +205,7 @@ export function calculateCampaign(
         : 0n;
       return {
         ...pool,
+        ...(tierCalculation ? { tiers: tierCalculation.breakdown } : {}),
         netSpend,
         threshold,
         spendingCap: cap,

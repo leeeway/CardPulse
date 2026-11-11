@@ -31,7 +31,7 @@ const campaign = () => ({
 });
 
 it('旧版缺省字段仍可读取，未知库版本不会被静默降级', () => {
-  for (const version of [undefined, 1, 2]) {
+  for (const version of [undefined, 1, 2, 3]) {
     const result = normalizeWorkspace({
       version,
       transactions: [transaction()],
@@ -40,7 +40,7 @@ it('旧版缺省字段仍可读取，未知库版本不会被静默降级', () =
     assert.deepEqual(result.statements, []);
     assert.deepEqual(result.campaigns, []);
   }
-  for (const version of [0, 3, '2', {}, 2.5])
+  for (const version of [0, 4, '2', {}, 2.5])
     assert.throws(
       () => normalizeWorkspace({ ...workspace(), version }),
       /版本/,

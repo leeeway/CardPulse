@@ -104,7 +104,7 @@ it('未知版本、未知字段、恶意字段类型及损坏的批次整体拒�
   for (const value of [
     '{bad',
     'null',
-    wrap([rule], { version: 3 }),
+    wrap([rule], { version: 4 }),
     wrap([rule], { transactions: [] }),
     wrap([{ ...rule, id: 'overwrite' }]),
     wrap([{ ...rule, last4: '1234' }]),

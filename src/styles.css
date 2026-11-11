@@ -561,6 +561,31 @@ input {
 .campaign-form h3 {
   margin-bottom: 16px;
 }
+.campaign-tiers {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  min-width: 0;
+}
+.tier-editor-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: end;
+  margin-bottom: 12px;
+}
+.campaign-tiers > p {
+  margin-bottom: 12px;
+}
+.tier-editor-row .field {
+  flex: 1 1 140px;
+  min-width: 0;
+}
+.tier-rules ul,
+.tier-calculation {
+  padding-left: 20px;
+  overflow-wrap: anywhere;
+}
 .rules-controls {
   display: flex;
   flex-wrap: wrap;

@@ -1,6 +1,7 @@
 import { fromScaledBigInt } from './rewards.js';
 import { PERIOD_LABELS } from './campaigns.js';
 import { escapeCsvCell } from './safe-csv.js';
+import { isProgressive } from './campaign-tiers.js';
 
 // Deliberate projection: never serialize transactions, card digits, sources or workspace fields.
 export function exportCampaignReport(result, t = (text) => text) {
@@ -48,6 +49,12 @@ export function exportCampaignReport(result, t = (text) => text) {
   const note = t(
     '独立估算，不代表银行实际入账；退款不回补额度，不自动合并其他活动。',
   );
+  const rateDescription = isProgressive(campaign)
+    ? `${t('分段累进费率')}: ${campaign.tiers.map((tier, index) => `${tier.from} → ${campaign.tiers[index + 1]?.from ?? t('不限')}: ${tier.ratePercent}%`).join('; ')}`
+    : campaign.ratePercent;
+  const reportNote = isProgressive(campaign)
+    ? `${note} ${t('退款从封顶计奖消费的最高已用分段向下扣回；不追溯原单、不释放额度。')}`
+    : note;
   const rows = periods.map((p) => [
     ...metadata,
     p.key === 'campaign' ? t('整个活动') : p.key,
@@ -59,20 +66,22 @@ export function exportCampaignReport(result, t = (text) => text) {
     money(p.spendingCap),
     money(p.used),
     money(p.remaining),
-    campaign.ratePercent,
+    rateDescription,
     money(p.beforeRefund),
     money(p.rewardCap),
     money(p.cappedBeforeRefund),
     money(p.appliedClawback),
     money(p.cashback),
-    note,
+    reportNote,
   ]);
   rows.push([
     ...metadata,
     t('活动合计'),
-    ...Array(13).fill(''),
+    ...Array(8).fill(''),
+    rateDescription,
+    ...Array(4).fill(''),
     money(cashback),
-    note,
+    reportNote,
   ]);
   return (
     '\uFEFF' +

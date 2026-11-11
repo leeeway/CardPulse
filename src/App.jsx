@@ -527,7 +527,10 @@ export default function App() {
   };
   const mutateCampaigns = (next) => {
     if (!unavailable && !isDemo) {
-      const updated = { ...workspace, campaigns: next(campaigns) };
+      const updated = normalizeWorkspace({
+        ...workspace,
+        campaigns: next(campaigns),
+      });
       setWorkspace(updated);
       setDirty(hasVault || hasWorkspaceData(updated));
     }

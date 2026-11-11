@@ -81,7 +81,7 @@ try {
     buffer: Buffer.from(
       JSON.stringify({
         format: 'CardPulseCampaigns',
-        version: 2,
+        version: 3,
         campaigns: [
           {
             name: 'Native rule template',
@@ -90,7 +90,12 @@ try {
             currency: 'CNY',
             startDate: '2026-01-01',
             endDate: '2026-12-31',
-            ratePercent: '1',
+            ratePercent: '0',
+            rewardType: 'progressive',
+            tiers: [
+              { from: '0', ratePercent: '1' },
+              { from: '1000', ratePercent: '3' },
+            ],
             period: 'statement',
             statementDay: '25',
             dateBasis: 'posting',
@@ -134,6 +139,14 @@ try {
     /Native rule template/,
   );
   await page.getByRole('button', { name: '编辑活动', exact: true }).click();
+  assert.equal(
+    await page.getByLabel('第 2 段起点', { exact: true }).inputValue(),
+    '1000',
+  );
+  assert.equal(
+    await page.getByLabel('第 2 段费率（%）', { exact: true }).inputValue(),
+    '3',
+  );
   assert.equal(
     await page.getByLabel('每月结单日', { exact: true }).inputValue(),
     '25',

@@ -1,6 +1,7 @@
 import { validateCampaign } from './campaigns.js';
 import { isIsoDate } from './campaigns.js';
 import { cents } from './reconciliation.js';
+import { isProgressive } from './campaign-tiers.js';
 export const emptyWorkspace = () => ({
   version: 2,
   transactions: [],
@@ -58,7 +59,7 @@ export function normalizeWorkspace(data) {
   )
     throw new Error('本地库不存在或格式无效');
   // Missing version denotes the original transaction-only vault.
-  if (data.version != null && ![1, 2].includes(data.version))
+  if (data.version != null && ![1, 2, 3].includes(data.version))
     throw new Error('本地库版本不受支持，请使用兼容版本的应用');
   if (!uniqueIds(data.transactions) || !uniqueIds(data.statements || []))
     throw new Error('本地库不存在或格式无效');
@@ -133,7 +134,7 @@ export function normalizeWorkspace(data) {
   const campaigns = (data.campaigns || []).map(validateCampaign);
   if (!uniqueIds(campaigns)) throw new Error('本地库不存在或格式无效');
   return {
-    version: 2,
+    version: campaigns.some(isProgressive) ? 3 : 2,
     transactions: data.transactions,
     statements: data.statements || [],
     campaigns,

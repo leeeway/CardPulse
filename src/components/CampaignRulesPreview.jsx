@@ -2,6 +2,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import { BANKS, cardName } from '../core/banks.js';
 import { channelText } from '../core/i18n.js';
 import { PERIOD_LABELS } from '../core/campaigns.js';
+import { isProgressive } from '../core/campaign-tiers.js';
+import CampaignTierRules from './CampaignTierRules.jsx';
 
 export default function CampaignRulesPreview({
   rules,
@@ -75,7 +77,9 @@ export default function CampaignRulesPreview({
                 ['币种', rule.currency],
                 ['起始日期', rule.startDate],
                 ['结束日期', rule.endDate],
-                ['回赠比例（%）', rule.ratePercent],
+                ...(isProgressive(rule)
+                  ? [['奖赏计算方式', t('分段累进费率')]]
+                  : [['回赠比例（%）', rule.ratePercent]]),
                 ['封顶周期', t(PERIOD_LABELS[rule.period])],
                 ...(rule.period === 'statement'
                   ? [['每月结单日', rule.statementDay]]
@@ -96,6 +100,7 @@ export default function CampaignRulesPreview({
                 </div>
               ))}
             </dl>
+            {isProgressive(rule) && <CampaignTierRules campaign={rule} t={t} />}
             {rule.period === 'statement' && (
               <p className="notice-inline">
                 {t(

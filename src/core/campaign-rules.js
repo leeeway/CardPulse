@@ -1,4 +1,5 @@
 import { validateCampaign } from './campaigns.js';
+import { isProgressive } from './campaign-tiers.js';
 
 export const MAX_RULES_BYTES = 256 * 1024;
 export const MAX_RULES_COUNT = 50;
@@ -49,6 +50,8 @@ function projectRule(value) {
   }
   const valid = validateCampaign({
     ...selected,
+    ...(value.rewardType != null ? { rewardType: value.rewardType } : {}),
+    ...(value.tiers != null ? { tiers: value.tiers } : {}),
     ...(value.period === 'statement'
       ? { statementDay: value.statementDay }
       : {}),
@@ -63,6 +66,10 @@ function projectRule(value) {
   );
   if (valid.period === 'statement')
     projected.statementDay = String(valid.statementDay);
+  if (isProgressive(valid)) {
+    projected.rewardType = 'progressive';
+    projected.tiers = valid.tiers;
+  }
   return projected;
 }
 
@@ -78,7 +85,11 @@ export function serializeCampaignRules(campaigns) {
   const content = JSON.stringify(
     {
       format: 'CardPulseCampaigns',
-      version: rules.some((rule) => rule.period === 'statement') ? 2 : 1,
+      version: rules.some(isProgressive)
+        ? 3
+        : rules.some((rule) => rule.period === 'statement')
+          ? 2
+          : 1,
       campaigns: rules,
     },
     null,
@@ -104,7 +115,7 @@ export function parseCampaignRules(content) {
   if (
     !record(data) ||
     data.format !== 'CardPulseCampaigns' ||
-    ![1, 2].includes(data.version)
+    ![1, 2, 3].includes(data.version)
   )
     throw new Error('活动规则格式或版本不受支持');
   if (
@@ -120,7 +131,8 @@ export function parseCampaignRules(content) {
       Object.keys(value).some(
         (key) =>
           !fields.includes(key) &&
-          !(data.version === 2 && key === 'statementDay'),
+          !(data.version >= 2 && key === 'statementDay') &&
+          !(data.version === 3 && ['rewardType', 'tiers'].includes(key)),
       )
     )
       throw new Error('活动规则包含不支持的字段');

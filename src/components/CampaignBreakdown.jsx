@@ -5,6 +5,8 @@ import {
   explainCampaignTransactions,
 } from '../core/campaigns.js';
 import { fromScaledBigInt } from '../core/rewards.js';
+import { isProgressive } from '../core/campaign-tiers.js';
+import CampaignTierRules from './CampaignTierRules.jsx';
 
 export default function CampaignBreakdown({ result, transactions, t }) {
   const getEntries = useCallback(
@@ -30,6 +32,9 @@ export default function CampaignBreakdown({ result, transactions, t }) {
               : '按记账日期',
           )}
         </p>
+        {isProgressive(result.campaign) && (
+          <CampaignTierRules campaign={result.campaign} t={t} />
+        )}
         {result.campaign.period === 'statement' && (
           <p className="notice-inline">
             {t(
@@ -64,7 +69,9 @@ export default function CampaignBreakdown({ result, transactions, t }) {
                 ['剩余消费额度', money(period.remaining)],
                 [
                   '封顶前奖赏',
-                  `${money(period.used)} × ${result.campaign.ratePercent}% = ${money(period.beforeRefund)}`,
+                  isProgressive(result.campaign)
+                    ? money(period.beforeRefund)
+                    : `${money(period.used)} × ${result.campaign.ratePercent}% = ${money(period.beforeRefund)}`,
                 ],
                 ['奖赏上限', money(period.rewardCap)],
                 ['奖赏封顶后', money(period.cappedBeforeRefund)],
@@ -77,6 +84,16 @@ export default function CampaignBreakdown({ result, transactions, t }) {
                 </div>
               ))}
             </dl>
+            {period.tiers && (
+              <ul className="tier-calculation">
+                {period.tiers.map((tier, index) => (
+                  <li key={index}>
+                    {money(tier.from)} → {money(tier.to)}：{money(tier.used)} ×{' '}
+                    {tier.ratePercent}% = {money(tier.reward)}
+                  </li>
+                ))}
+              </ul>
+            )}
             {!period.thresholdMet && (
               <p className="notice-inline">
                 {t('净消费门槛未达标，本周期奖赏为零。')}
