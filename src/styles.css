@@ -1053,6 +1053,28 @@ footer a {
 .campaign-breakdown > details {
   margin-top: 14px;
 }
+.campaign-simulator {
+  margin-top: 12px;
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+.campaign-simulator > p,
+.campaign-simulator > form,
+.simulation-result {
+  margin-top: 12px;
+}
+.simulation-result dl > div {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+}
+.simulation-result dd {
+  margin: 0;
+  font-weight: 600;
+}
 .period-calculation {
   margin: 12px 0;
   padding: 12px;

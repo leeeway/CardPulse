@@ -13,6 +13,7 @@ import { channelText } from '../core/i18n.js';
 import CampaignBreakdown from './CampaignBreakdown.jsx';
 import CampaignRulesPreview from './CampaignRulesPreview.jsx';
 import CampaignTierEditor from './CampaignTierEditor.jsx';
+import CampaignSpendSimulator from './CampaignSpendSimulator.jsx';
 import { isProgressive } from '../core/campaign-tiers.js';
 import { exportCampaignReport } from '../core/campaign-report.js';
 import { campaignStatus, filterCampaigns } from '../core/campaign-list.js';
@@ -509,6 +510,13 @@ export default function CampaignPanel({
                   <CampaignBreakdown
                     result={result}
                     transactions={transactions}
+                    t={t}
+                  />
+                  <CampaignSpendSimulator
+                    campaign={result.campaign}
+                    transactions={transactions}
+                    today={today}
+                    disabled={disabled}
                     t={t}
                   />
                 </>
