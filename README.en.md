@@ -197,6 +197,15 @@ Node.js 24.12+ is recommended. Build tools need a network connection to download
 
 ## Main branch additions (not yet packaged): progressive rates, statement cycles, and campaign management
 
+### Campaign spending scenarios
+
+Expand a campaign's spending simulator and enter a positive amount and a date within its range. Compare the target period's original reward, simulated reward, change, net-spending threshold gap, and remaining spending allowance. Flat and progressive rates, statement cycles, caps, and refunds use the existing calculation engine. For example, with 900 in spending, a 1,000 minimum, and a 5% rate, adding 100 unlocks the period's reward from zero to 50.
+
+- Confirm eligibility first. The hypothetical debit is assumed to match the configured bank, card, last four digits, channel, and merchant. Actual eligibility is not verified, and other campaigns are not combined.
+- The date follows the campaign's posting or transaction basis. Both comparisons use the later of the current Hong Kong date and the scenario date. Future dates therefore include already imported records through that cutoff, which is displayed explicitly; those records are not attributed to the hypothetical purchase. The main campaign card retains today's cutoff.
+- Each calculation adds one hypothetical purchase to an in-memory copy of the ledger; repeated runs replace rather than accumulate scenarios. Editing inputs clears the previous result. Submitted results update when transactions, applied rules, or today's date change. Thresholds can unlock an entire period's rewards, while progressive refund clawbacks and reward caps can produce zero or negative changes. Check the period details.
+- Scenarios remain in memory, do not mark the workspace as unsaved, and never enter transactions, vaults, rule files, or reports. Locking, reloading, or filtering the campaign out clears them. A scenario alone does not pause idle locking. This is a comparison under current settings, not a bank promise or a multi-card optimization strategy.
+
 ### Progressive marginal rates
 
 Choose progressive rates under the reward calculation method and configure 2–8 bands. The first starts at zero, subsequent starting amounts must increase strictly, and the final band is unlimited. Amounts and percentage rates accept two decimal places. Rates may range from 0% to 100%, with at least one positive band. Switching methods clears rate settings and eligibility confirmation for rechecking.
@@ -278,7 +287,7 @@ These features are not implemented and are outside the current support scope. Su
 1. **Desktop release quality**: verify installation, upgrades, and data retention after uninstall on Windows hardware, and add release signing.
 2. **Campaign models**: add whole-spend rate upgrades, points, and actual closing-date adjustments; define stacking and exclusions, and link refunds across periods.
 3. **More native bank PDFs**: collect redacted fixtures and reconciliation tests before adding each adapter; retain standard CSV as the common import route.
-4. **Further extensions**: local OCR, Beancount / Ledger export, and spending strategy simulation.
+4. **Further extensions**: local OCR, Beancount / Ledger export, and multi-card strategy simulation with stacking.
 
 Local vaults and encrypted backups validate data versions, record IDs, and key nested fields. Unsupported versions and damaged content are rejected before they can cause errors after restoration.
 
