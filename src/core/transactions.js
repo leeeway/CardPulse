@@ -1,3 +1,4 @@
+import { escapeCsvCell } from './safe-csv.js';
 import { bankOf } from './banks.js';
 import { channelText } from './i18n.js';
 
@@ -53,15 +54,7 @@ export function exportToSafeCsv(transactions, translate = (text) => text) {
     '结单文件名',
   ];
 
-  const escapeCell = (value) => {
-    if (value === null || value === undefined) return '""';
-    let str = String(value).trim();
-    // 防范 CSV Formula Injection
-    if (/^[=+\-@\t\r]/.test(str)) {
-      str = `'${str}`;
-    }
-    return `"${str.replaceAll('"', '""')}"`;
-  };
+  const escapeCell = escapeCsvCell;
 
   const rows = transactions.map((tx) => [
     escapeCell(tx.transactionDay || tx.day),

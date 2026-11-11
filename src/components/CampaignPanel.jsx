@@ -12,6 +12,7 @@ import { fromScaledBigInt } from '../core/rewards.js';
 import { channelText } from '../core/i18n.js';
 import CampaignBreakdown from './CampaignBreakdown.jsx';
 import CampaignRulesPreview from './CampaignRulesPreview.jsx';
+import { exportCampaignReport } from '../core/campaign-report.js';
 import { campaignStatus, filterCampaigns } from '../core/campaign-list.js';
 import {
   MAX_RULES_BYTES,
@@ -32,6 +33,7 @@ export default function CampaignPanel({
   onEditingChange,
   onImportRules,
   onExportRules,
+  onExportReport,
   allCampaignNames,
 }) {
   const [draft, setDraft] = useState(null);
@@ -506,6 +508,20 @@ export default function CampaignPanel({
                 </button>
                 <button
                   className="btn btn-ghost"
+                  disabled={disabled || Boolean(result.error)}
+                  onClick={() => {
+                    try {
+                      onExportReport(exportCampaignReport(result, t));
+                      setRulesError('');
+                    } catch (error) {
+                      setRulesError(error.message);
+                    }
+                  }}
+                >
+                  {t('导出奖赏核对表')}
+                </button>
+                <button
+                  className="btn btn-ghost"
                   disabled={disabled}
                   onClick={() => {
                     if (!canReplaceDraft()) return;
@@ -539,6 +555,11 @@ export default function CampaignPanel({
           <span>{t('尚未添加活动')}</span>
         </div>
       )}
+      <p className="muted small">
+        {t(
+          '核对表为明文，包含活动名称及消费／奖赏汇总，不含逐笔交易或卡号；不替代加密备份。',
+        )}
+      </p>
       <p className="muted small">{t('已保存到加密库的活动会随解锁恢复。')}</p>
     </section>
   );

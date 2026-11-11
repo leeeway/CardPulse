@@ -927,6 +927,13 @@ export default function App() {
         onEditingChange={setCampaignEditing}
         allCampaignNames={campaigns.map((campaign) => campaign.name)}
         onImportRules={importCampaignRules}
+        onExportReport={(content) =>
+          download(
+            content,
+            `CardPulse-rewards-${getHongKongDate()}.csv`,
+            'text/csv;charset=utf-8',
+          )
+        }
         onExportRules={(content) =>
           download(
             content,

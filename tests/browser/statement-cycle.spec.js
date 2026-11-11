@@ -44,6 +44,15 @@ test('statement cycles expose boundaries, survive encryption, and share through 
   const card = page.locator('.activity-card').first();
   await expect(card).toContainText('每月 25 日结单');
   await expect(card.locator('.reward-card-value')).toContainText('16.50');
+  const reportDownload = page.waitForEvent('download');
+  await card
+    .getByRole('button', { name: '导出奖赏核对表', exact: true })
+    .click();
+  const report = await readFile(await (await reportDownload).path(), 'utf8');
+  expect(report).toContain('活动合计');
+  expect(report).toContain('16.50');
+  expect(report).not.toContain('SYNTHETIC');
+
   await card.getByText('本期估算', { exact: true }).click();
   await expect(card.locator('.period-calculation')).toHaveCount(3);
   await expect(
