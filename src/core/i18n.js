@@ -1,5 +1,11 @@
 // UI text is translated explicitly; transaction descriptions and user activity names stay untouched.
 export const traditional = {
+  说明原因: '說明原因',
+  全部原因: '全部原因',
+  搜索说明记录: '搜尋說明記錄',
+  按商户与描述搜索: '按商戶與描述搜尋',
+  '筛选显示 {count} 笔': '篩選顯示 {count} 筆',
+  重置说明筛选: '重設說明篩選',
   活动消费试算: '活動簽賬試算',
   试算消费金额: '試算簽賬金額',
   试算消费日期: '試算簽賬日期',

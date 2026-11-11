@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { filterExplanations } from '../core/explanation-filters.js';
 const PAGE_SIZE = 25;
 export default function TransactionExplanations({
   getEntries,
@@ -9,16 +10,22 @@ export default function TransactionExplanations({
 }) {
   const [open, setOpen] = useState(false);
   const [status, setStatus] = useState('all');
+  const [reason, setReason] = useState('all');
+  const [query, setQuery] = useState('');
   const [page, setPage] = useState(0);
   const entries = useMemo(() => (open ? getEntries() : []), [open, getEntries]);
   const filtered = useMemo(
-    () =>
-      entries.filter(
-        (entry) =>
-          status === 'all' || entry.included === (status === 'included'),
-      ),
-    [entries, status],
+    () => filterExplanations(entries, { status, reason, query }),
+    [entries, status, reason, query],
   );
+  const reasonCounts = useMemo(() => {
+    const counts = new Map();
+    for (const entry of entries)
+      counts.set(entry.reason, (counts.get(entry.reason) || 0) + 1);
+    // Retain a selected reason after a correction removes its last matching record.
+    if (reason !== 'all' && !counts.has(reason)) counts.set(reason, 0);
+    return [...counts];
+  }, [entries, reason]);
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const currentPage = Math.min(page, pageCount - 1);
   const excludedCounts = useMemo(() => {
@@ -71,6 +78,53 @@ export default function TransactionExplanations({
               <option value="excluded">{t('仅排除记录')}</option>
             </select>
           </label>
+          <div className="form-grid">
+            <label className="field">
+              <span>{t('说明原因')}</span>
+              <select
+                aria-label={t('说明原因')}
+                value={reason}
+                onChange={(event) => {
+                  setReason(event.target.value);
+                  setPage(0);
+                }}
+              >
+                <option value="all">{t('全部原因')}</option>
+                {reasonCounts.map(([key, count]) => (
+                  <option key={key} value={key}>
+                    {t(reasonLabels[key] || key)} · {count}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="field">
+              <span>{t('搜索说明记录')}</span>
+              <input
+                type="search"
+                value={query}
+                placeholder={t('按商户与描述搜索')}
+                onChange={(event) => {
+                  setQuery(event.target.value);
+                  setPage(0);
+                }}
+              />
+            </label>
+          </div>
+          <p className="muted small" aria-live="polite">
+            {t('筛选显示 {count} 笔', { count: filtered.length })}
+          </p>
+          <button
+            type="button"
+            className="btn btn-ghost"
+            onClick={() => {
+              setStatus('all');
+              setReason('all');
+              setQuery('');
+              setPage(0);
+            }}
+          >
+            {t('重置说明筛选')}
+          </button>
           {filtered.length ? (
             <div className="explanation-table">
               <table>

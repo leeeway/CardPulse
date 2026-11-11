@@ -22,16 +22,14 @@ test('campaign explanations show caps, refunds, exclusions, pagination and updat
     '2027-01-01,SHOP FUTURE,100.00,HKD,debit,spend,online',
     '2025-12-31,SHOP OLD,100.00,HKD,debit,spend,online',
   );
-  await page
-    .locator('input[accept=".pdf,.csv"]')
-    .setInputFiles({
-      name: 'explanations.csv',
-      mimeType: 'text/csv',
-      buffer: Buffer.from(
-        'day,description,amount,currency,direction,category,channel\n' +
-          rows.join('\n'),
-      ),
-    });
+  await page.locator('input[accept=".pdf,.csv"]').setInputFiles({
+    name: 'explanations.csv',
+    mimeType: 'text/csv',
+    buffer: Buffer.from(
+      'day,description,amount,currency,direction,category,channel\n' +
+        rows.join('\n'),
+    ),
+  });
   await expect(page.locator('tbody tr')).toHaveCount(32);
   await button('添加活动').click();
   const form = page.locator('.campaign-form');
@@ -74,6 +72,13 @@ test('campaign explanations show caps, refunds, exclusions, pagination and updat
   await audit.getByLabel('说明记录范围').selectOption('excluded');
   await expect(audit.locator('tbody tr')).toHaveCount(5);
   await expect(audit).toContainText('第 1 / 1 页');
+  await audit.getByLabel('说明原因').selectOption('channel');
+  await expect(audit.locator('tbody tr')).toHaveCount(1);
+  await audit.getByLabel('搜索说明记录').fill(' shop channel ');
+  await expect(audit.locator('tbody tr')).toHaveCount(1);
+  await audit.getByLabel('搜索说明记录').fill('not a merchant');
+  await expect(audit.locator('tbody tr')).toHaveCount(0);
+  await audit.getByLabel('搜索说明记录').fill('');
   await page.getByLabel('搜索商户、卡号或备注').fill('SHOP CHANNEL');
   await page
     .locator('.transactions-section tbody tr')
@@ -83,9 +88,21 @@ test('campaign explanations show caps, refunds, exclusions, pagination and updat
   await review.getByLabel('支付渠道', { exact: true }).selectOption('online');
   await review.getByRole('button', { name: '应用修正' }).click();
   await expect(audit).toContainText('计入 28 笔，排除 4 笔');
-  await expect(audit.locator('tbody tr')).toHaveCount(4);
+  await expect(audit.locator('tbody tr')).toHaveCount(0);
+  await expect(audit.getByLabel('说明原因')).toHaveValue('channel');
+  await expect(audit.getByLabel('说明原因')).toContainText(
+    '支付渠道不匹配 · 0',
+  );
+  await audit
+    .getByRole('button', { name: '重置说明筛选', exact: true })
+    .click();
+  await expect(audit.locator('tbody tr')).toHaveCount(25);
+  await audit.getByLabel('说明原因').selectOption('refund');
+  await expect(audit.locator('tbody tr')).toHaveCount(1);
+  await expect(card.locator('.reward-card-value')).toContainText('15.00');
   await page.getByLabel('语言', { exact: true }).selectOption('zh-TW');
   await expect(audit.getByLabel('說明記錄範圍')).toBeVisible();
+  await expect(audit.getByLabel('說明原因')).toHaveValue('refund');
   await page.setViewportSize({ width: 390, height: 844 });
   await page.screenshot({
     path: testInfo.outputPath('campaign-explanation-mobile.png'),
