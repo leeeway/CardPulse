@@ -197,6 +197,12 @@ Node.js 24.12+ is recommended. Build tools need a network connection to download
 
 ## Main branch additions (not yet packaged): statement cycles and reusable campaign rules
 
+### Reward reconciliation reports
+
+Each campaign card exports a CSV with the estimate cutoff, date basis, eligibility, per-period spending, refunds, thresholds, caps, clawbacks, and a reward total. It uses applied workspace settings, excluding editor drafts. Amounts display to cents; component rounding can produce small differences. Unconfirmed or unmatched campaigns retain their status and a zero total without fabricated periods.
+
+Reports are plaintext and contain campaign names and aggregate amounts, excluding individual transactions, merchant descriptions, card digits, and source files. Store them appropriately. They are neither encrypted backups nor bank postings. Estimates remain independent and do not automatically combine campaigns.
+
 ### Campaign management
 
 Search campaign names or merchant keywords and filter active, upcoming, ended, or unconfirmed campaigns. Date status follows the Hong Kong date, includes both boundary dates, and is independent of eligibility. Search combines with status and bank filters; an empty result offers a reset button.
