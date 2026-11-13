@@ -49,6 +49,7 @@ import {
 } from './core/workspace.js';
 import CampaignPanel from './components/CampaignPanel.jsx';
 import BuildInfo from './components/BuildInfo.jsx';
+import DuplicateTransactions from './components/DuplicateTransactions.jsx';
 import useHongKongDate from './hooks/useHongKongDate.js';
 import useBackupReminder from './hooks/useBackupReminder.js';
 import useIdleLock from './hooks/useIdleLock.js';
@@ -1106,6 +1107,17 @@ export default function App() {
               ))}
           </div>
         </details>
+      )}
+      {!isDemo && bankTransactions.length > 0 && (
+        <DuplicateTransactions
+          key={`duplicates-${workspaceSession}-${vaultLocked}-${activeBank}`}
+          transactions={bankTransactions}
+          statements={statements}
+          disabled={unavailable}
+          onReview={setReviewId}
+          bankName={bankName}
+          t={t}
+        />
       )}
       <section
         className="transactions-section"
