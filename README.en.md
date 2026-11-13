@@ -197,6 +197,12 @@ Node.js 24.12+ is recommended. Build tools need a network connection to download
 
 ## Refreshed v0.2.0: progressive rates, statement cycles, and campaign management
 
+### Version and build identity
+
+Expand the build information at the bottom of the page to see the application version, source revision, UTC build time, source modification status at build time, build type, and runtime. These distinguish refreshed installers sharing `v0.2.0`; downloaded files still need the release SHA-256 check. Build identity is a label, not a signature or notarization.
+
+Copying includes only public metadata and browser/desktop platform and architecture, excluding transactions, card numbers, passwords, device names, and local paths. Nothing is sent automatically. If browser clipboard access fails, select the read-only text and copy manually; unlocking the vault is unnecessary. Development and production builds are identified separately. Source archives or machines without Git explicitly report unknown revision/status rather than assuming clean sources.
+
 ### Filtering transaction explanations
 
 Pulse and custom campaign explanations combine inclusion status, a specific reason, and merchant-description search. Reason options show total counts; filtered results use 25 rows per page and offer a reset button. Corrections update results immediately. A selected reason remains selected even if its count drops to zero. These filters affect only the explanation table, leaving rewards, the transaction table, and exports unchanged.
@@ -278,7 +284,7 @@ These features are included in the refreshed `v0.2.0` installers. Version number
 - Automatic locking clears the workspace, input drafts, and search state from the page while keeping the encrypted local vault and exported backups. It does not autosave, discard unsaved content, or cache passwords. Unlocking requires the password again.
 - Returning to the window or making the page visible checks whether the timeout has elapsed. Sleep and background throttling can delay timer execution; the app checks again on return. This measures inactivity in the app window, not OS-wide idle time, and does not lock the operating system.
 
-These features are included in the v0.2.0 installers refreshed on 2026-11-11. The version number and download URLs are unchanged; download again and check the updated SHA-256 manifest.
+These features are included in the v0.2.0 installers refreshed on 2026-11-13. The version number and download URLs are unchanged; download again and check the updated SHA-256 manifest.
 
 ## Planned work
 
