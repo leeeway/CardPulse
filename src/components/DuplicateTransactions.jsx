@@ -31,10 +31,13 @@ function DuplicateGroup({ group, disabled, onReview, bankName, t }) {
             currentPage * RECORD_PAGE_SIZE,
             (currentPage + 1) * RECORD_PAGE_SIZE,
           )
-          .map(({ transaction, statement }) => (
+          .map(({ transaction, statement, statementNumber }) => (
             <li key={transaction.id}>
               <div>
                 <strong>{statement.fileName || t('未知结单')}</strong>
+                <span className="badge-tag">
+                  {t('结单 {number}', { number: statementNumber })}
+                </span>
                 <p className="muted small">
                   {transaction.description} · {t('交易日期')}：
                   {transaction.transactionDay || t('未记录')}

@@ -5,7 +5,10 @@ import { isIsoDate } from './campaigns.js';
 /** Advisory only: equal posted evidence across known statements is not proof of duplication. */
 export function findPotentialDuplicates(transactions, statements) {
   const sources = new Map(
-    statements.map((statement) => [statement.id, statement]),
+    statements.map((statement, index) => [
+      statement.id,
+      { statement, number: index + 1 },
+    ]),
   );
   const candidates = new Map();
   let checkedCount = 0;
@@ -51,8 +54,12 @@ export function findPotentialDuplicates(transactions, statements) {
       entries: [],
       statementIds: new Set(),
     };
-    group.entries.push({ transaction, statement: source });
-    group.statementIds.add(source.id);
+    group.entries.push({
+      transaction,
+      statement: source.statement,
+      statementNumber: source.number,
+    });
+    group.statementIds.add(source.statement.id);
     candidates.set(key, group);
   }
   const groups = [...candidates.values()]

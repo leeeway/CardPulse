@@ -110,6 +110,11 @@ export default function App() {
   const [workspace, setWorkspace] = useState(emptyWorkspace);
   const [workspaceSession, setWorkspaceSession] = useState(0);
   const { transactions, statements, campaigns } = workspace;
+  const statementNumbers = useMemo(
+    () =>
+      new Map(statements.map((statement, index) => [statement.id, index + 1])),
+    [statements],
+  );
   const workspaceHasData = hasWorkspaceData(workspace);
   const [activeBank, setActiveBank] = useState('all');
   const [importBank, setImportBank] = useState('hsbc');
@@ -1077,6 +1082,11 @@ export default function App() {
               .map((statement) => (
                 <div key={statement.id} className="statement-row">
                   <strong>{statement.fileName}</strong> ·{' '}
+                  <span className="badge-tag">
+                    {t('结单 {number}', {
+                      number: statementNumbers.get(statement.id),
+                    })}
+                  </span>{' '}
                   {t('{count} 笔交易', { count: statement.transactionCount })}
                   {(statement.reconciliation || []).map((result) => (
                     <p key={result.currency}>

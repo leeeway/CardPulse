@@ -66,6 +66,7 @@ test('cross-statement warnings preserve records, support review, ignore table fi
     /has-changes/,
   );
   const overlap = panel.locator('li').filter({ hasText: 'second.csv' });
+  await expect(overlap).toContainText('结单 2');
   await button(overlap, '核对交易').click();
   const dialog = page.getByRole('dialog', { name: '核对交易', exact: true });
   await dialog.getByLabel('支付渠道', { exact: true }).selectOption('exclude');
@@ -88,6 +89,7 @@ test('cross-statement warnings preserve records, support review, ignore table fi
   const statement = page
     .locator('.statement-row')
     .filter({ hasText: 'second.csv' });
+  await expect(statement).toContainText('結單 2');
   page.once('dialog', (confirmation) => confirmation.accept());
   await button(statement, '刪除結單').click();
   await expect(panel).toContainText('未發現符合檢查條件');

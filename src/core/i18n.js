@@ -1,5 +1,6 @@
 // UI text is translated explicitly; transaction descriptions and user activity names stay untouched.
 export const traditional = {
+  '结单 {number}': '結單 {number}',
   卡片未记录: '卡片未記錄',
   '末四位缺省的记录仍可提示，但无法确认是否同一张实体卡。':
     '末四位缺省的記錄仍可提示，但無法確認是否同一張實體卡。',

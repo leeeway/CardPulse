@@ -19,6 +19,26 @@ const tx = (patch = {}) => ({
   category: 'spend',
   ...patch,
 });
+it('同名不同来源仍分开编号，来源对象保持原样', () => {
+  const sources = statements.map((statement) => ({
+    ...statement,
+    fileName: 'same.csv',
+  }));
+  const result = findPotentialDuplicates(
+    [tx(), tx({ id: 's2:0', statementId: 's2' })],
+    sources,
+  );
+  assert.deepEqual(
+    result.groups[0].entries.map((entry) => entry.statementNumber),
+    [1, 2],
+  );
+  assert.ok(
+    result.groups[0].entries.every(
+      (entry) => entry.statement.fileName === 'same.csv',
+    ),
+  );
+  assert.ok(sources.every((statement) => !Object.hasOwn(statement, 'number')));
+});
 it('跨结单按标准化证据分组，保留每份结单内所有记录，不修改原数据', () => {
   const transactions = [
     tx(),
