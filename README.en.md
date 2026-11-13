@@ -197,6 +197,14 @@ Node.js 24.12+ is recommended. Build tools need a network connection to download
 
 ## Refreshed v0.2.0: progressive rates, statement cycles, and campaign management
 
+### Cross-statement overlap checks
+
+Expand the duplicate transaction check after importing records. It follows the bank workspace, independently of transaction search or date filters. Records are flagged only when bank, card, last four digits, posting date, currency, direction, amount, and merchant description match across known statements. Amounts use integer cents; descriptions normalize only case and whitespace, without fuzzy merchant matching.
+
+- Each record shows its source file and transaction date, with a direct review action. Identical entries within one statement alone do not trigger a cross-statement warning. If another statement overlaps, all matching entries are shown without assuming which are extra. Views paginate at five groups and ten records per group.
+- Warnings never automatically delete, merge, or reduce rewards. Matching evidence may describe separate purchases; missing last-four digits cannot prove the same physical card. Unlinked records and insufficient fields are counted as skipped. An empty result does not prove that all duplicates have been ruled out.
+- Manually excluding a record from rewards recalculates estimates but leaves the record and overlap warning intact. If an entire statement is confirmed redundant, remove it through statement reconciliation and save manually. Checking alone does not mark unsaved changes or add vault fields; locking clears the plaintext candidates.
+
 ### Version and build identity
 
 Expand the build information at the bottom of the page to see the application version, source revision, UTC build time, source modification status at build time, build type, and runtime. These distinguish refreshed installers sharing `v0.2.0`; downloaded files still need the release SHA-256 check. Build identity is a label, not a signature or notarization.
