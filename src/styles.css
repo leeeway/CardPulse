@@ -1058,6 +1058,39 @@ footer a {
   border-top: 1px solid var(--border);
   padding-top: 12px;
 }
+.build-info {
+  margin-top: 28px;
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+.build-info dl > div {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0;
+}
+.build-info dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  max-width: 100%;
+}
+.build-info p,
+.build-info .field {
+  margin-top: 12px;
+}
+.build-info textarea {
+  width: 100%;
+  min-width: 0;
+  resize: vertical;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+  font: 12px/1.6 monospace;
+}
 .campaign-simulator > p,
 .campaign-simulator > form,
 .simulation-result {

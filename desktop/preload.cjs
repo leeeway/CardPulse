@@ -4,6 +4,8 @@ contextBridge.exposeInMainWorld(
   'cardpulseDesktop',
   Object.freeze({
     platform: process.platform,
+    arch: process.arch,
+    copyBuildInfo: () => ipcRenderer.invoke('build:copy-info'),
     readVault: () => ipcRenderer.invoke('vault:read'),
     writeVault: (payload) => ipcRenderer.invoke('vault:write', payload),
     clearVault: () => ipcRenderer.invoke('vault:clear'),

@@ -48,6 +48,7 @@ import {
   hasWorkspaceData,
 } from './core/workspace.js';
 import CampaignPanel from './components/CampaignPanel.jsx';
+import BuildInfo from './components/BuildInfo.jsx';
 import useHongKongDate from './hooks/useHongKongDate.js';
 import useBackupReminder from './hooks/useBackupReminder.js';
 import useIdleLock from './hooks/useIdleLock.js';
@@ -1341,6 +1342,7 @@ export default function App() {
           </div>
         )}
       </section>
+      <BuildInfo t={t} />
       <footer>
         <span>CardPulse</span>
         <span>{t('本地估算工具 · 与银行无官方关联')}</span>

@@ -8,6 +8,7 @@ const {
   ipcMain,
   dialog,
   shell,
+  clipboard,
 } = require('electron');
 const fs = require('node:fs/promises');
 const path = require('node:path');
@@ -59,6 +60,33 @@ function registerHandler(channel, handler) {
   });
 }
 function registerStorage() {
+  // Capture the running build once; replacing files on disk must not change its identity.
+  const buildInfo = fs
+    .readFile(path.join(dist, 'build-info.json'), 'utf8')
+    .then(JSON.parse)
+    .catch(() => null);
+  registerHandler('build:copy-info', async () => {
+    const info = await buildInfo;
+    if (!info) throw new Error('构建信息不可用');
+    // No renderer text, path or clipboard read access: only bundled public metadata is copied.
+    clipboard.writeText(
+      JSON.stringify(
+        {
+          format: info.format,
+          schemaVersion: info.schemaVersion,
+          version: info.version,
+          revision: info.revision,
+          dirty: info.dirty,
+          builtAt: info.builtAt,
+          mode: info.mode,
+          runtime: `desktop/${process.platform}/${process.arch}`,
+        },
+        null,
+        2,
+      ),
+    );
+    return true;
+  });
   registerHandler('vault:read', () => readVault(vaultPath()));
   registerHandler('vault:write', async (payload) => {
     await writeVault(vaultPath(), payload);

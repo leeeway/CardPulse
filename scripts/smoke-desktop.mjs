@@ -33,6 +33,36 @@ try {
     if (/^https?:/.test(request.url())) external.push(request.url());
   });
   await page.getByRole('heading', { name: '银行工作区' }).waitFor();
+  const buildPanel = page.locator('.build-info');
+  await buildPanel.locator('summary').click();
+  const publicReport = await buildPanel
+    .getByLabel('构建信息文本', { exact: true })
+    .inputValue();
+  assert.equal(JSON.parse(publicReport).mode, 'production');
+  // Stub writes to avoid changing the user's system clipboard during this smoke test.
+  await application.evaluate(({ clipboard }) => {
+    globalThis.__originalBuildClipboard = clipboard.writeText;
+    clipboard.writeText = (text) => {
+      globalThis.__copiedBuildReport = text;
+    };
+  });
+  try {
+    await buildPanel
+      .getByRole('button', { name: '复制构建信息', exact: true })
+      .click();
+    await page.getByText('构建信息已复制', { exact: true }).waitFor();
+    assert.equal(
+      await application.evaluate(() => globalThis.__copiedBuildReport),
+      publicReport,
+    );
+  } finally {
+    await application.evaluate(({ clipboard }) => {
+      clipboard.writeText = globalThis.__originalBuildClipboard;
+      delete globalThis.__originalBuildClipboard;
+      delete globalThis.__copiedBuildReport;
+    });
+  }
+  await buildPanel.locator('summary').click();
   assert.equal(
     await page.evaluate(() => window.isSecureContext && Boolean(crypto.subtle)),
     true,

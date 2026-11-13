@@ -5,6 +5,22 @@ import { spawnSync } from 'node:child_process';
 import { join } from 'node:path';
 import { listPackage, extractFile } from '@electron/asar';
 const { version } = JSON.parse(await readFile('package.json', 'utf8'));
+const buildInfo = JSON.parse(await readFile('dist/build-info.json', 'utf8'));
+assert.equal(buildInfo.format, 'CardPulseBuild');
+assert.equal(buildInfo.schemaVersion, 1);
+assert.equal(buildInfo.version, version);
+assert.equal(buildInfo.mode, 'production');
+assert.equal(
+  buildInfo.dirty,
+  false,
+  'Release must be built from a clean checkout',
+);
+assert.equal(
+  buildInfo.revision,
+  run('git', ['rev-parse', 'HEAD']).trim(),
+  'Build identity must match release source',
+);
+assert(Number.isFinite(Date.parse(buildInfo.builtAt)));
 const sourceHashes = new Map();
 const digest = (buffer) => createHash('sha256').update(buffer).digest('hex');
 async function hashTree(directory) {
