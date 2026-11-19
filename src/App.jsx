@@ -77,6 +77,7 @@ const emptyFilters = () => ({
   category: 'all',
   from: '',
   to: '',
+  statementId: '',
 });
 function download(content, fileName, type) {
   const url = URL.createObjectURL(new Blob([content], { type }));
@@ -117,6 +118,14 @@ export default function App() {
   );
   const workspaceHasData = hasWorkspaceData(workspace);
   const [activeBank, setActiveBank] = useState('all');
+  const bankStatements = useMemo(
+    () =>
+      statements.filter(
+        (statement) =>
+          activeBank === 'all' || (statement.bankId || 'hsbc') === activeBank,
+      ),
+    [statements, activeBank],
+  );
   const [importBank, setImportBank] = useState('hsbc');
   const [importCard, setImportCard] = useState('hsbc_pulse');
   const [dirty, setDirty] = useState(false);
@@ -152,6 +161,7 @@ export default function App() {
   const [loadingFile, setLoadingFile] = useState(false);
   const busyRef = useRef(false);
   const fileInputRef = useRef(null);
+  const transactionsHeadingRef = useRef(null);
   const backupInputRef = useRef(null);
   const pdfPasswordResolver = useRef(null);
   const unavailable =
@@ -206,8 +216,12 @@ export default function App() {
     [activeTransactions, activeBank],
   );
   const filteredList = useMemo(
-    () => filterTransactions(bankTransactions, filters),
-    [bankTransactions, filters],
+    () =>
+      filterTransactions(
+        bankTransactions,
+        isDemo ? { ...filters, statementId: '' } : filters,
+      ),
+    [bankTransactions, filters, isDemo],
   );
   const rewards = useMemo(
     () =>
@@ -219,6 +233,21 @@ export default function App() {
   );
   const reviewTarget = transactions.find((tx) => tx.id === reviewId);
   const showPulse = activeBank === 'all' || activeBank === 'hsbc';
+  const selectBank = (bankId) => {
+    if (bankId !== activeBank)
+      setFilters((previous) => ({ ...previous, statementId: '' }));
+    setActiveBank(bankId);
+  };
+  const viewStatement = (statement) => {
+    if (unavailable || isDemo || busyRef.current) return;
+    // Reuse the current scope unless the source lies outside it.
+    if (!bankStatements.some(({ id }) => id === statement.id))
+      setActiveBank('all');
+    setFilters({ ...emptyFilters(), statementId: statement.id });
+    const heading = transactionsHeadingRef.current;
+    heading?.focus({ preventScroll: true });
+    heading?.scrollIntoView({ block: 'start' });
+  };
 
   const openPassword = (mode) => {
     setMasterPassword('');
@@ -522,6 +551,11 @@ export default function App() {
     const updated = removeStatement(workspace, statement.id);
     const needsSave = hasVault || hasWorkspaceData(updated);
     setWorkspace(updated);
+    setFilters((previous) =>
+      previous.statementId === statement.id
+        ? { ...previous, statementId: '' }
+        : previous,
+    );
     setReviewId(null);
     setDirty(needsSave);
     setNotice([
@@ -862,7 +896,7 @@ export default function App() {
       </VaultSettings>
       <BankWorkspace
         selected={activeBank}
-        onSelect={setActiveBank}
+        onSelect={selectBank}
         transactions={activeTransactions}
         bankName={bankName}
         t={t}
@@ -1071,50 +1105,53 @@ export default function App() {
         <details className="statement-status">
           <summary>
             <FileText size={16} />
-            {t('查看结单与对账')} · {statements.length}
+            {t('查看结单与对账')} · {bankStatements.length}
           </summary>
           <div aria-label={t('结单与对账结果')}>
-            {statements
-              .filter(
-                (s) =>
-                  activeBank === 'all' || (s.bankId || 'hsbc') === activeBank,
-              )
-              .map((statement) => (
-                <div key={statement.id} className="statement-row">
-                  <strong>{statement.fileName}</strong> ·{' '}
-                  <span className="badge-tag">
-                    {t('结单 {number}', {
-                      number: statementNumbers.get(statement.id),
-                    })}
-                  </span>{' '}
-                  {t('{count} 笔交易', { count: statement.transactionCount })}
-                  {(statement.reconciliation || []).map((result) => (
-                    <p key={result.currency}>
-                      {result.currency}：
-                      {t(
-                        result.status === 'matched'
-                          ? '对账一致'
-                          : result.status === 'mismatch'
-                            ? '对账不符，差额 {difference}'
-                            : '缺少结欠，未验证对账',
-                        { difference: result.difference },
-                      )}
-                    </p>
-                  ))}
-                  {statement.warnings?.map((warning, index) => (
-                    <p key={index}>{t(warning)}</p>
-                  ))}
-                  <button
-                    type="button"
-                    className="btn btn-ghost"
-                    disabled={unavailable}
-                    onClick={() => deleteStatement(statement)}
-                  >
-                    <Trash2 size={14} />
-                    {t('删除结单')}
-                  </button>
-                </div>
-              ))}
+            {bankStatements.map((statement) => (
+              <div key={statement.id} className="statement-row">
+                <strong>{statement.fileName}</strong> ·{' '}
+                <span className="badge-tag">
+                  {t('结单 {number}', {
+                    number: statementNumbers.get(statement.id),
+                  })}
+                </span>{' '}
+                {t('{count} 笔交易', { count: statement.transactionCount })}
+                {(statement.reconciliation || []).map((result) => (
+                  <p key={result.currency}>
+                    {result.currency}：
+                    {t(
+                      result.status === 'matched'
+                        ? '对账一致'
+                        : result.status === 'mismatch'
+                          ? '对账不符，差额 {difference}'
+                          : '缺少结欠，未验证对账',
+                      { difference: result.difference },
+                    )}
+                  </p>
+                ))}
+                {statement.warnings?.map((warning, index) => (
+                  <p key={index}>{t(warning)}</p>
+                ))}
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  disabled={unavailable}
+                  onClick={() => viewStatement(statement)}
+                >
+                  {t('查看该结单交易')}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  disabled={unavailable}
+                  onClick={() => deleteStatement(statement)}
+                >
+                  <Trash2 size={14} />
+                  {t('删除结单')}
+                </button>
+              </div>
+            ))}
           </div>
         </details>
       )}
@@ -1125,6 +1162,7 @@ export default function App() {
           statements={statements}
           disabled={unavailable}
           onReview={setReviewId}
+          onViewStatement={viewStatement}
           bankName={bankName}
           t={t}
         />
@@ -1134,13 +1172,40 @@ export default function App() {
         aria-labelledby="transactions-heading"
       >
         <div className="section-heading compact">
-          <h2 id="transactions-heading">{t('交易记录')}</h2>
+          <h2
+            id="transactions-heading"
+            ref={transactionsHeadingRef}
+            tabIndex={-1}
+          >
+            {t('交易记录')}
+          </h2>
           <span className="muted small">
             {t('{count} 笔交易', { count: filteredList.length })}
           </span>
         </div>
         {activeTransactions.length > 0 && (
           <div className="filter-bar">
+            {!isDemo && bankStatements.length > 0 && (
+              <select
+                className="statement-filter"
+                aria-label={t('结单来源')}
+                value={filters.statementId}
+                onChange={(event) => {
+                  const statementId = event.target.value;
+                  setFilters((previous) => ({ ...previous, statementId }));
+                }}
+              >
+                <option value="">{t('全部结单及记录')}</option>
+                {bankStatements.map((statement) => (
+                  <option key={statement.id} value={statement.id}>
+                    {t('结单 {number}', {
+                      number: statementNumbers.get(statement.id),
+                    })}{' '}
+                    · {statement.fileName || t('未知结单')}
+                  </option>
+                ))}
+              </select>
+            )}
             <input
               className="search-input"
               type="search"
@@ -1252,7 +1317,9 @@ export default function App() {
                 {t('重置筛选')}
               </button>
               <p className="muted small">
-                {t('日期筛选仅影响交易列表和 CSV 导出，不改变奖赏计算。')}
+                {t(
+                  '筛选范围适用于交易列表和导出的 CSV。奖赏按银行范围内的记录估算。',
+                )}
               </p>
               {invalidDateRange && (
                 <p className="error" id="date-filter-error" role="alert">

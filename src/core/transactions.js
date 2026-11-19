@@ -1,6 +1,7 @@
 import { escapeCsvCell } from './safe-csv.js';
 import { bankOf } from './banks.js';
 import { channelText } from './i18n.js';
+import { belongsToStatement } from './imports.js';
 
 /**
  * 交易列表过滤、统计与安全 CSV 导出工具
@@ -14,10 +15,12 @@ export function filterTransactions(transactions, filters) {
     from = '',
     to = '',
     category = 'all',
+    statementId = '',
   } = filters;
   const query = search.trim().toLowerCase();
 
   return transactions.filter((tx) => {
+    if (statementId && !belongsToStatement(tx, statementId)) return false;
     if (currency !== 'all' && tx.currency !== currency) return false;
     if (direction !== 'all' && tx.direction !== direction) return false;
     if (category !== 'all' && tx.category !== category) return false;

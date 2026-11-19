@@ -1,5 +1,10 @@
 // UI text is translated explicitly; transaction descriptions and user activity names stay untouched.
 export const traditional = {
+  查看该结单交易: '查看該結單交易',
+  结单来源: '結單來源',
+  全部结单及记录: '全部結單及記錄',
+  '筛选范围适用于交易列表和导出的 CSV。奖赏按银行范围内的记录估算。':
+    '篩選範圍適用於交易列表和匯出的 CSV。獎賞按銀行範圍內的記錄估算。',
   '结单 {number}': '結單 {number}',
   卡片未记录: '卡片未記錄',
   '末四位缺省的记录仍可提示，但无法确认是否同一张实体卡。':

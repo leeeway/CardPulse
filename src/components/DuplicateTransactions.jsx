@@ -4,7 +4,14 @@ import { BANKS, bankOf, cardName } from '../core/banks.js';
 
 const GROUP_PAGE_SIZE = 5;
 const RECORD_PAGE_SIZE = 10;
-function DuplicateGroup({ group, disabled, onReview, bankName, t }) {
+function DuplicateGroup({
+  group,
+  disabled,
+  onReview,
+  onViewStatement,
+  bankName,
+  t,
+}) {
   const [page, setPage] = useState(0);
   const pages = Math.ceil(group.entries.length / RECORD_PAGE_SIZE);
   const currentPage = Math.min(page, pages - 1);
@@ -54,6 +61,14 @@ function DuplicateGroup({ group, disabled, onReview, bankName, t }) {
               >
                 {t('核对交易')}
               </button>
+              <button
+                type="button"
+                className="btn btn-ghost"
+                disabled={disabled}
+                onClick={() => onViewStatement(statement)}
+              >
+                {t('查看该结单交易')}
+              </button>
             </li>
           ))}
       </ol>
@@ -89,6 +104,7 @@ export default function DuplicateTransactions({
   statements,
   disabled,
   onReview,
+  onViewStatement,
   bankName,
   t,
 }) {
@@ -149,6 +165,7 @@ export default function DuplicateTransactions({
                 group={group}
                 disabled={disabled}
                 onReview={onReview}
+                onViewStatement={onViewStatement}
                 bankName={bankName}
                 t={t}
               />

@@ -69,6 +69,8 @@ Filter by inclusive **posting-date ranges**, or reset all transaction filters. D
 
 ### Transaction review and statement management
 
+**View transactions by statement (main branch):** Open a statement from the reconciliation list or a cross-statement overlap warning to show its transactions and clear other filters. The statement source filter can be combined with merchant, date, currency, and other transaction filters. Statement numbers distinguish files with identical names. CSV export follows the filtered list, while rewards use the selected bank scope. Changing banks or deleting the selected statement clears the statement filter.
+
 Transaction corrections and statement deletion are included starting with `v0.2.0-beta.2`.
 
 - Click **Review transaction** (核对交易 / 核對交易) on a transaction row to correct its category or payment channel. Debits can be spending or fees; credits can be refunds or repayments. Rewards recalculate immediately. The review dialog shows change history while retaining the original amount, dates, and source evidence.

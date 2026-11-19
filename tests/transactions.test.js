@@ -1,6 +1,9 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { filterTransactions, exportToSafeCsv } from '../src/core/transactions.js';
+import {
+  filterTransactions,
+  exportToSafeCsv,
+} from '../src/core/transactions.js';
 
 describe('交易工具与安全 CSV 导出', () => {
   const sampleTxs = [
@@ -12,7 +15,7 @@ describe('交易工具与安全 CSV 导出', () => {
       currency: 'HKD',
       direction: 'debit',
       category: 'spend',
-      last4: '8812'
+      last4: '8812',
     },
     {
       id: '2',
@@ -22,8 +25,8 @@ describe('交易工具与安全 CSV 导出', () => {
       currency: 'CNY',
       direction: 'debit',
       category: 'spend',
-      last4: '8812'
-    }
+      last4: '8812',
+    },
   ];
 
   it('按币种和搜索关键字过滤交易', () => {
@@ -34,6 +37,30 @@ describe('交易工具与安全 CSV 导出', () => {
     const searchApple = filterTransactions(sampleTxs, { search: 'apple' });
     assert.equal(searchApple.length, 1);
     assert.equal(searchApple[0].description, 'APPLE STORE');
+  });
+
+  it('按结单标识组合现有筛选，兼容旧记录并以显式关联为准', () => {
+    const statementId = 'csv:hsbc:hsbc_pulse:hash';
+    const linked = { ...sampleTxs[0], id: 'manual-1', statementId };
+    const legacy = { ...sampleTxs[1], id: `${statementId}:1` };
+    const other = {
+      ...sampleTxs[0],
+      id: `${statementId}:2`,
+      statementId: 'different',
+    };
+    const prefixOnly = { ...sampleTxs[0], id: `${statementId}-other:0` };
+    assert.deepEqual(
+      filterTransactions([linked, legacy, other, prefixOnly], { statementId }),
+      [linked, legacy],
+    );
+    assert.deepEqual(
+      filterTransactions([linked, legacy, other, prefixOnly], {
+        statementId,
+        currency: 'CNY',
+        search: 'apple',
+      }),
+      [legacy],
+    );
   });
 
   it('CSV 导出防范公式注入攻击 (Formula Injection)', () => {
@@ -47,8 +74,8 @@ describe('交易工具与安全 CSV 导出', () => {
         direction: 'debit',
         category: 'spend',
         notes: ['@malicious'],
-        last4: '8812'
-      }
+        last4: '8812',
+      },
     ];
 
     const csv = exportToSafeCsv(dangerousTxs);

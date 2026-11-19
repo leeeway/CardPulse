@@ -1034,6 +1034,11 @@ footer a {
   width: 100%;
   font-size: 12px;
 }
+.filter-bar .statement-filter {
+  min-width: 0;
+  max-width: min(100%, 340px);
+  text-overflow: ellipsis;
+}
 .date-filter label {
   display: grid;
   gap: 6px;
