@@ -23,6 +23,7 @@ import { fetchHkdCnyRate } from './core/exchange.js';
 import {
   fingerprintFile,
   mergeStatement,
+  applyStatementImportSelection,
   belongsToStatement,
   removeStatement,
 } from './core/imports.js';
@@ -473,29 +474,46 @@ export default function App() {
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
-  const confirmImport = () => {
+  const confirmImport = (skippedIds) => {
     if (!importPreview || busyRef.current || vaultLocked) return;
-    setImportPreview(null);
     if (workspace !== importPreview.base) {
+      setImportPreview(null);
       setNotice([{ text: '工作区已变更，请重新选择文件以核对导入预览。' }]);
       return;
     }
-    setWorkspace(importPreview.next);
+    const next = applyStatementImportSelection(
+      importPreview.next,
+      importPreview.pendingIds,
+      skippedIds,
+    );
+    if (next.transactions.length === workspace.transactions.length) return;
+    const importedStatements = new Map(
+      next.statements.map((statement) => [statement.id, statement]),
+    );
+    setImportPreview(null);
+    setWorkspace(next);
     setDirty(true);
     setIsDemo(false);
     setActiveBank('all');
     setNotice(
-      importPreview.files.flatMap(({ fileName, statement, messages }) =>
-        statement
-          ? [
-              {
-                file: fileName,
-                text: '已导入 {count} 笔交易',
-                values: { count: statement.transactionCount },
-              },
-            ]
-          : messages.map((text) => ({ file: fileName, text })),
-      ),
+      importPreview.files.flatMap(({ fileName, statement, messages }) => {
+        if (!statement)
+          return messages.map((text) => ({ file: fileName, text }));
+        const imported = importedStatements.get(statement.id);
+        if (!imported) return [{ file: fileName, text: '全部交易已跳过' }];
+        return [
+          {
+            file: fileName,
+            text: imported.skippedTransactionCount
+              ? '已导入 {count} 笔交易，跳过 {skipped} 笔'
+              : '已导入 {count} 笔交易',
+            values: {
+              count: imported.transactionCount,
+              skipped: imported.skippedTransactionCount,
+            },
+          },
+        ];
+      }),
     );
   };
   const handlePasswordSubmit = async (event) => {
@@ -1265,6 +1283,14 @@ export default function App() {
                   })}
                 </span>{' '}
                 {t('{count} 笔交易', { count: statement.transactionCount })}
+                {statement.skippedTransactionCount > 0 && (
+                  <p>
+                    {t(
+                      '导入时跳过 {count} 笔交易。对账基于原文件解析的全部交易。',
+                      { count: statement.skippedTransactionCount },
+                    )}
+                  </p>
+                )}
                 {(statement.reconciliation || []).map((result) => (
                   <p key={result.currency}>
                     {result.currency}：

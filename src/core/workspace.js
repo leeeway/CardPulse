@@ -108,6 +108,9 @@ export function normalizeWorkspace(data) {
         (statement.transactionCount != null &&
           (!Number.isSafeInteger(statement.transactionCount) ||
             statement.transactionCount < 0)) ||
+        (statement.skippedTransactionCount != null &&
+          (!Number.isSafeInteger(statement.skippedTransactionCount) ||
+            statement.skippedTransactionCount < 1)) ||
         (statement.reconciliation != null &&
           (!Array.isArray(statement.reconciliation) ||
             statement.reconciliation.some(

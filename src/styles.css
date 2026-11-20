@@ -1000,6 +1000,9 @@ footer a {
   margin: 16px 0 8px;
   font-size: 15px;
 }
+.import-preview-body h3:first-child {
+  margin-top: 0;
+}
 .import-preview-files {
   padding: 0;
   list-style: none;
@@ -1017,6 +1020,21 @@ footer a {
 .import-preview-details {
   margin-top: 6px;
   padding-left: 20px;
+}
+.import-preview-choice {
+  margin: 0;
+  cursor: pointer;
+}
+.import-preview-entry-date {
+  display: block;
+}
+.import-preview-footer {
+  align-items: center;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.import-preview-total {
+  flex: 1 1 210px;
 }
 .batch-review-controls {
   display: flex;

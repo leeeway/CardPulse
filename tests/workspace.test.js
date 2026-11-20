@@ -101,6 +101,8 @@ it('拒绝无法显示的结单摘要与对账记录', () => {
       reconciliation: [{ currency: 'HKD', status: 'matched', difference: {} }],
     },
     { id: 's1', transactionCount: -1 },
+    { id: 's1', skippedTransactionCount: -1 },
+    { id: 's1', skippedTransactionCount: '1' },
   ])
     assert.throws(() =>
       normalizeWorkspace({ ...workspace(), statements: [statement] }),
@@ -138,6 +140,7 @@ it('加密正确但内容损坏的备份在恢复前被拒绝；有效嵌套信�
       fileName: 'example.csv',
       warnings: ['Verify'],
       transactionCount: 1,
+      skippedTransactionCount: 1,
       reconciliation: [
         { currency: 'HKD', status: 'unverified', difference: null },
       ],

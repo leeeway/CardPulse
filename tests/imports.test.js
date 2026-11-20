@@ -1,6 +1,11 @@
 import { it } from 'node:test';
 import assert from 'node:assert/strict';
-import { fingerprintFile, mergeStatement } from '../src/core/imports.js';
+import {
+  applyStatementImportSelection,
+  fingerprintFile,
+  mergeStatement,
+  removeStatement,
+} from '../src/core/imports.js';
 
 it('同内容改名后导入不会重复计账，同名不同内容保留不同交易 ID', async () => {
   const first = new File(['pdf content'], 'a.pdf');
@@ -27,4 +32,48 @@ it('标准 CSV 按银行及卡片隔离指纹，避免把不同银行的相同�
   const hsbc = { bankId: 'hsbc', cardId: 'hsbc_pulse' };
   assert.equal(await fingerprintFile(file, boc), await fingerprintFile(renamed, boc));
   assert.notEqual(await fingerprintFile(file, boc), await fingerprintFile(file, hsbc));
+});
+
+it('筛选待入账交易保留其 ID、原始对账和文件指纹，整份跳过不登记文件', () => {
+  const statement = {
+    fileName: 'statement.pdf',
+    reconciliation: [
+      { currency: 'HKD', status: 'matched', difference: '0.00' },
+    ],
+    transactions: [{ amount: '10.00' }, { amount: '20.00' }],
+  };
+  const existing = mergeStatement(
+    { statements: [], transactions: [] },
+    statement,
+    'existing',
+  );
+  const staged = mergeStatement(
+    mergeStatement(existing, statement, 'partial'),
+    statement,
+    'full',
+  );
+  const original = structuredClone(staged);
+  const filtered = applyStatementImportSelection(
+    staged,
+    new Set(['partial', 'full']),
+    new Set(['existing:0', 'partial:0', 'full:0', 'full:1', 'unknown:0']),
+  );
+  assert.deepEqual(
+    filtered.transactions.map(({ id }) => id),
+    ['existing:0', 'existing:1', 'partial:1'],
+  );
+  assert.equal(filtered.statements[0], existing.statements[0]);
+  assert.deepEqual(filtered.statements[1], {
+    ...staged.statements[1],
+    transactionCount: 1,
+    skippedTransactionCount: 1,
+  });
+  assert.equal(filtered.statements.length, 2);
+  assert.equal(mergeStatement(filtered, statement, 'partial').duplicate, true);
+  assert.equal(mergeStatement(filtered, statement, 'full').duplicate, false);
+  assert.deepEqual(
+    removeStatement(filtered, 'partial').transactions,
+    existing.transactions,
+  );
+  assert.deepEqual(staged, original);
 });

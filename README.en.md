@@ -59,7 +59,7 @@ Open the local address printed in your terminal, usually `http://localhost:5173`
 
 ## Using CardPulse
 
-1. **Preview and import statements**: Choose the bank and card, then add PDFs or standard CSVs. In the import preview (available on the main branch), check each filename, the identified bank and card, transaction counts, and possible duplicates. Choose **Confirm import** to add the batch or **Cancel** to discard it. Encrypted PDFs prompt for the file password first. Canceling that prompt skips that file only.
+1. **Preview and import statements**. Choose the bank and card, then add PDFs or standard CSVs. In the import preview (available on the main branch), check the sources, transaction counts, and possible duplicates. Possible duplicates are kept by default. Uncheck individual entries to skip them and update the file and batch counts. Choose **Confirm import** to add the retained transactions or **Cancel** to discard the batch. Encrypted PDFs prompt for the file password first. Canceling that prompt skips that file only.
 2. **Check the results**: Review transactions, detected payment channels, warnings, and each statement’s reconciliation status. Compare uncertain records with the original PDF.
 3. **Review cashback estimates**: The dashboard summarizes eligible records from the start of the current year through today. HKD rewards are converted using a public reference exchange rate. If the rate is unavailable, affected CNY totals are shown as unknown.
 4. **Save your records**: Select **“保存到加密库”** (Save to encrypted vault). Set a master password on the first save, then use the existing password for updates. **Importing does not automatically save your records.**
@@ -112,7 +112,7 @@ A matched balance confirms arithmetic consistency. It does not confirm transacti
 
 **Reward rules are an estimation model.** The app does not automatically verify current bank terms, promotion registration, merchant eligibility, or individual account conditions. See the [Pulse configuration](src/core/rules/hsbc_pulse.js) and [calculation engine](src/core/rewards.js) for the implemented rules. Actual rewards are determined by the bank.
 
-Identical files are skipped even if renamed. Standard CSVs are checked separately for each bank and card. The preview flags possible overlaps among pending files and with transactions already imported. Compare them with the original statements. Confirming adds all pending transactions. Older records without file fingerprints or statement links require manual review.
+Identical files are skipped even if renamed. Standard CSVs are checked separately for each bank and card. The preview flags possible overlaps among pending files and with transactions already imported. Check the original statements to decide which pending entries to skip. Partially imported statements keep their file fingerprint and show the number skipped. Reconciliation still uses all transactions parsed from the original file. You can select a fully skipped file again. Older records without file fingerprints or statement links require manual review.
 
 Parser compatibility has been checked with synthetic data. More redacted real statement samples are needed to cover layout variations. Review extracted results when using an unsupported format.
 

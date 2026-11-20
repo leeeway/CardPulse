@@ -31,6 +31,41 @@ export function mergeStatement(workspace, statement, fingerprint) {
   };
 }
 
+/** Keep staged transaction IDs and the original reconciliation for partial imports. */
+export function applyStatementImportSelection(
+  workspace,
+  pendingIds,
+  skippedIds,
+) {
+  if (!skippedIds.size) return workspace;
+  const skippedByStatement = new Map();
+  const transactions = workspace.transactions.filter((transaction) => {
+    const { id, statementId } = transaction;
+    if (!pendingIds.has(statementId) || !skippedIds.has(id)) return true;
+    skippedByStatement.set(
+      statementId,
+      (skippedByStatement.get(statementId) || 0) + 1,
+    );
+    return false;
+  });
+  if (!skippedByStatement.size) return workspace;
+  const statements = workspace.statements.flatMap((statement) => {
+    const skipped = skippedByStatement.get(statement.id);
+    if (!skipped) return [statement];
+    const retained = statement.transactionCount - skipped;
+    return retained > 0
+      ? [
+          {
+            ...statement,
+            transactionCount: retained,
+            skippedTransactionCount: skipped,
+          },
+        ]
+      : [];
+  });
+  return { ...workspace, transactions, statements };
+}
+
 /** New records carry an explicit link; legacy imports used fingerprint:index IDs. */
 export function belongsToStatement(transaction, statementId) {
   if (transaction.statementId != null)
