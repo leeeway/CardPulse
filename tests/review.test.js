@@ -2,7 +2,12 @@ import { channelText, translate } from '../src/core/i18n.js';
 import { cardName } from '../src/core/banks.js';
 import { it } from 'node:test';
 import assert from 'node:assert/strict';
-import { reviewTransaction, categoryText } from '../src/core/review.js';
+import {
+  reviewTransaction,
+  reviewTransactions,
+  categoryText,
+} from '../src/core/review.js';
+import { previewReviewRewards } from '../src/core/review-rewards.js';
 import { emptyWorkspace, normalizeWorkspace } from '../src/core/workspace.js';
 import { mergeStatement, removeStatement } from '../src/core/imports.js';
 import { calculateRewards, fromScaledBigInt } from '../src/core/rewards.js';
@@ -30,6 +35,134 @@ const data = () => ({ ...emptyWorkspace(), transactions: [tx()] });
 const options = { today: '2026-10-18' };
 const reward = (workspace) =>
   fromScaledBigInt(calculateRewards(workspace.transactions, options).totalCny);
+
+it('批次只修改指定字段并逐笔保留原始证据，重复选择或无变化不会重复写入日志', () => {
+  const first = tx();
+  const second = tx({
+    id: 't2',
+    category: 'fee',
+    channel: { key: 'online', uncertain: true },
+  });
+  const unrelated = tx({ id: 'other' });
+  const original = { ...data(), transactions: [first, second, unrelated] };
+  const at = '2026-11-20T04:00:00.000Z';
+  const result = reviewTransactions(
+    original,
+    ['t1', 't2', 't2'],
+    { category: 'fee' },
+    at,
+  );
+  assert.equal(result.changes.length, 1);
+  assert.equal(result.workspace.transactions[0].category, 'fee');
+  assert.equal(result.workspace.transactions[0].channel, first.channel);
+  assert.equal(result.workspace.transactions[0].sources, first.sources);
+  assert.deepEqual(result.workspace.transactions[0].reviewHistory[0], {
+    at,
+    before: { category: 'spend', channel: first.channel },
+    after: { category: 'fee', channel: first.channel },
+  });
+  assert.equal(result.workspace.transactions[1], second);
+  assert.equal(result.workspace.transactions[2], unrelated);
+  assert.equal(first.category, 'spend');
+  assert.equal(
+    reviewTransactions(result.workspace, ['t1', 't2'], { category: 'fee' })
+      .workspace,
+    result.workspace,
+  );
+});
+
+it('批次方向冲突、币种限制或过期选择整体拒绝，混合收支可修改渠道', () => {
+  const original = {
+    ...data(),
+    transactions: [
+      tx(),
+      tx({ id: 'credit', direction: 'credit', category: 'repayment' }),
+    ],
+  };
+  for (const [ids, patch] of [
+    [['t1', 'credit'], { category: 'fee' }],
+    [['t1', 'missing'], { channel: 'exclude' }],
+    [['t1', 'credit'], { channel: 'baseOnly' }],
+    [Array.from({ length: 101 }, (_, i) => `t${i}`), { channel: 'exclude' }],
+  ])
+    assert.throws(() => reviewTransactions(original, ids, patch));
+  assert.ok(
+    original.transactions.every(
+      (tx) => tx.channel.uncertain && !tx.reviewHistory,
+    ),
+  );
+  const result = reviewTransactions(original, ['t1', 'credit'], {
+    channel: 'exclude',
+  });
+  assert.equal(result.changes.length, 2);
+  assert.deepEqual(
+    result.workspace.transactions.map((tx) => tx.category),
+    ['spend', 'repayment'],
+  );
+  assert.ok(
+    result.workspace.transactions.every(
+      (tx) => tx.channel.key === 'exclude' && !tx.channel.uncertain,
+    ),
+  );
+});
+
+it('批量奖赏预览按原币区分 Pulse，活动单独重算且不改原工作区', () => {
+  const original = {
+    ...data(),
+    transactions: [tx(), tx({ id: 'hkd', currency: 'HKD' })],
+    campaigns: [
+      {
+        id: 'eligible',
+        name: 'Apple Pay offer',
+        bankId: 'hsbc',
+        currency: 'CNY',
+        startDate: '2026-01-01',
+        endDate: '2026-12-31',
+        period: 'monthly',
+        dateBasis: 'posting',
+        channel: 'applePay',
+        ratePercent: '5',
+        registrationConfirmed: true,
+      },
+    ],
+  };
+  const result = reviewTransactions(original, ['t1', 'hkd'], {
+    channel: 'applePay',
+  });
+  assert.deepEqual(
+    previewReviewRewards(
+      original,
+      result.workspace,
+      result.changes,
+      options.today,
+    ).map(({ key, previous, next }) => [
+      key,
+      fromScaledBigInt(previous),
+      fromScaledBigInt(next),
+    ]),
+    [
+      ['pulse:cny', '2.40', '4.40'],
+      ['campaign:eligible', '0.00', '5.00'],
+    ],
+  );
+  const excluded = reviewTransactions(original, ['hkd'], {
+    channel: 'exclude',
+  });
+  assert.deepEqual(
+    previewReviewRewards(
+      original,
+      excluded.workspace,
+      excluded.changes,
+      options.today,
+    ).map(({ key, previous, next }) => [
+      key,
+      fromScaledBigInt(previous),
+      fromScaledBigInt(next),
+    ]),
+    [['pulse:hkd', '0.40', '0.00']],
+  );
+  assert.ok(original.transactions.every((tx) => !tx.reviewHistory));
+});
 
 it('修正渠道重算 Pulse 和活动奖赏，保留原始证据及有序修改记录', async () => {
   const original = data();

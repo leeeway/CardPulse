@@ -26,8 +26,14 @@ import {
   belongsToStatement,
   removeStatement,
 } from './core/imports.js';
-import { reviewTransaction, categoryText } from './core/review.js';
+import {
+  reviewTransaction,
+  reviewTransactions,
+  categoryText,
+  MAX_BATCH_REVIEW,
+} from './core/review.js';
 import TransactionReviewDialog from './components/TransactionReviewDialog.jsx';
+import BatchReviewDialog from './components/BatchReviewDialog.jsx';
 import PulseBreakdown from './components/PulseBreakdown.jsx';
 import { createVaultClient } from './core/storage.js';
 import { BANKS, getBank, bankOf, cardsFor, cardName } from './core/banks.js';
@@ -148,6 +154,8 @@ export default function App() {
   const [pdfPasswordRequest, setPdfPasswordRequest] = useState(null);
   const [filters, setFilters] = useState(emptyFilters);
   const [reviewId, setReviewId] = useState(null);
+  const [batchIds, setBatchIds] = useState(null);
+  const [batchReviewOpen, setBatchReviewOpen] = useState(false);
   const [vaultLocked, setVaultLocked] = useState(false);
   const [hasVault, setHasVault] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
@@ -174,6 +182,7 @@ export default function App() {
     showPasswordModal ||
     showChangePassword ||
     Boolean(reviewId) ||
+    batchReviewOpen ||
     Boolean(pdfPasswordRequest) ||
     loadingFile ||
     vaultBusy ||
@@ -223,6 +232,25 @@ export default function App() {
       ),
     [bankTransactions, filters, isDemo],
   );
+  // A changed scope must not leave any off-screen transaction selected.
+  useEffect(() => {
+    setBatchIds(null);
+    setBatchReviewOpen(false);
+  }, [activeBank, filters, isDemo, vaultLocked, workspaceSession]);
+  const batchRows = useMemo(
+    () =>
+      batchIds?.size ? filteredList.filter((tx) => batchIds.has(tx.id)) : [],
+    [batchIds, filteredList],
+  );
+  const toggleBatchRow = (id) =>
+    setBatchIds((current) => {
+      if (!current || (!current.has(id) && current.size >= MAX_BATCH_REVIEW))
+        return current;
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   const rewards = useMemo(
     () =>
       calculateRewards(bankTransactions, { today, hkdCnyRate: rateInfo.rate }),
@@ -267,6 +295,8 @@ export default function App() {
     backupReminder.dismissPending();
     setWorkspaceSession((value) => value + 1);
     setReviewId(null);
+    setBatchIds(null);
+    setBatchReviewOpen(false);
     setWorkspace(emptyWorkspace());
     setFilters(emptyFilters());
     setActiveBank('all');
@@ -534,6 +564,28 @@ export default function App() {
       setNotice([{ text: error.message }]);
     }
   };
+  const applyBatchReview = (preview) => {
+    if (unavailable || isDemo || busyRef.current || workspace !== preview.base)
+      throw new Error('工作区已变化，请重新预览');
+    const visibleIds = new Set(batchRows.map((tx) => tx.id));
+    if (
+      visibleIds.size !== preview.ids.length ||
+      preview.ids.some((id) => !visibleIds.has(id))
+    )
+      throw new Error('工作区已变化，请重新预览');
+    const applied = reviewTransactions(workspace, preview.ids, preview.patch);
+    if (!applied.changes.length) throw new Error('工作区已变化，请重新预览');
+    setWorkspace(normalizeWorkspace(applied.workspace));
+    setDirty(true);
+    setBatchReviewOpen(false);
+    setBatchIds(null);
+    setNotice([
+      {
+        text: '已修正 {count} 笔交易，请保存到加密库。',
+        values: { count: applied.changes.length },
+      },
+    ]);
+  };
   const deleteStatement = (statement) => {
     if (unavailable || isDemo || busyRef.current) return;
     const count = transactions.filter((tx) =>
@@ -557,6 +609,7 @@ export default function App() {
         : previous,
     );
     setReviewId(null);
+    setBatchIds(null);
     setDirty(needsSave);
     setNotice([
       {
@@ -1329,11 +1382,40 @@ export default function App() {
             </div>
           </div>
         )}
+        {!isDemo && filteredList.length > 0 && (
+          <div className="batch-review-controls">
+            <button
+              type="button"
+              className="btn btn-secondary"
+              disabled={unavailable}
+              onClick={() => setBatchIds(batchIds ? null : new Set())}
+            >
+              {t(batchIds ? '退出交易选择' : '选择交易')}
+            </button>
+            {batchIds && (
+              <>
+                <span className="muted small" aria-live="polite">
+                  {t('已选 {count} 笔交易', { count: batchRows.length })} ·{' '}
+                  {t('每次最多 {limit} 笔', { limit: MAX_BATCH_REVIEW })}
+                </span>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  disabled={unavailable || !batchRows.length}
+                  onClick={() => setBatchReviewOpen(true)}
+                >
+                  {t('批量核对交易')}
+                </button>
+              </>
+            )}
+          </div>
+        )}
         {filteredList.length ? (
           <div className="table-container">
             <table>
               <thead>
                 <tr>
+                  {batchIds && <th scope="col">{t('选择')}</th>}
                   {[
                     '日期',
                     '银行与卡片',
@@ -1350,6 +1432,23 @@ export default function App() {
               <tbody>
                 {filteredList.map((tx) => (
                   <tr key={tx.id}>
+                    {batchIds && (
+                      <td>
+                        <input
+                          type="checkbox"
+                          aria-label={t('选择交易 {description}', {
+                            description: tx.description,
+                          })}
+                          checked={batchIds.has(tx.id)}
+                          disabled={
+                            unavailable ||
+                            (!batchIds.has(tx.id) &&
+                              batchIds.size >= MAX_BATCH_REVIEW)
+                          }
+                          onChange={() => toggleBatchRow(tx.id)}
+                        />
+                      </td>
+                    )}
                     <td>
                       <strong>{tx.day}</strong>
                       <small>
@@ -1554,6 +1653,17 @@ export default function App() {
           onClose={() => setReviewId(null)}
           t={t}
           locale={preferences.locale}
+        />
+      )}
+      {batchReviewOpen && batchRows.length > 0 && !isDemo && !unavailable && (
+        <BatchReviewDialog
+          workspace={workspace}
+          selected={batchRows}
+          today={today}
+          onApply={applyBatchReview}
+          onClose={() => setBatchReviewOpen(false)}
+          bankName={bankName}
+          t={t}
         />
       )}
       {pdfPasswordRequest && (

@@ -975,6 +975,30 @@ footer a {
   width: calc(100% - 32px);
   color: var(--text-main);
 }
+.modal-content.batch-review {
+  max-width: 640px;
+  max-height: calc(100dvh - 32px);
+  overflow: auto;
+}
+.batch-review-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.batch-review-rows,
+.batch-reward-preview ul {
+  max-height: 200px;
+  overflow: auto;
+  overflow-wrap: anywhere;
+  margin: 12px 0;
+  padding-left: 24px;
+}
+.batch-review-rows li + li,
+.batch-reward-preview li + li {
+  margin-top: 8px;
+}
 .backup-reminder {
   margin-top: 20px;
   padding-top: 20px;

@@ -69,6 +69,8 @@ Filter by inclusive **posting-date ranges**, or reset all transaction filters. D
 
 ### Transaction review and statement management
 
+**Batch review (main branch).** Choose Select transactions and mark up to 100 rows, then open batch review. Change the category, payment channel, or both. A shared category requires transactions of the same direction. Preview shows each source, the before and after classification, and reward changes for Pulse and each affected campaign in the original currency. Apply the preview to record a separate history entry for each changed transaction. Changing banks or filters clears the selection. Save to the encrypted vault to keep the changes.
+
 **View transactions by statement (main branch):** Open a statement from the reconciliation list or a cross-statement overlap warning to show its transactions and clear other filters. The statement source filter can be combined with merchant, date, currency, and other transaction filters. Statement numbers distinguish files with identical names. CSV export follows the filtered list, while rewards use the selected bank scope. Changing banks or deleting the selected statement clears the statement filter.
 
 Transaction corrections and statement deletion are included starting with `v0.2.0-beta.2`.
