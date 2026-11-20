@@ -1,3 +1,4 @@
+import { confirmStatementImport } from './import-preview.js';
 import { test, expect } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import { decryptWorkspace, parseBackup } from '../../src/core/backup.js';
@@ -15,6 +16,7 @@ async function importRow(page) {
       'day,description,amount,currency,direction\n2026-11-01,SYNTHETIC RACE SHOP,100.00,CNY,debit',
     ),
   });
+  await confirmStatementImport(page);
 }
 async function startExport(page, pass) {
   await button(page, '立即备份').click();

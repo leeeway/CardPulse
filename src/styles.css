@@ -980,6 +980,44 @@ footer a {
   max-height: calc(100dvh - 32px);
   overflow: auto;
 }
+.modal-content.statement-import-preview {
+  max-width: 680px;
+  max-height: calc(100dvh - 32px);
+  padding: clamp(16px, 4vw, 26px);
+}
+.statement-import-preview[open] {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.import-preview-body {
+  overflow: auto;
+  overflow-wrap: anywhere;
+  overscroll-behavior: contain;
+  min-height: 0;
+}
+.import-preview-body h3 {
+  margin: 16px 0 8px;
+  font-size: 15px;
+}
+.import-preview-files {
+  padding: 0;
+  list-style: none;
+}
+.import-preview-item {
+  margin-top: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.import-preview-item p + p,
+.import-preview-details li + li {
+  margin-top: 4px;
+}
+.import-preview-details {
+  margin-top: 6px;
+  padding-left: 20px;
+}
 .batch-review-controls {
   display: flex;
   flex-wrap: wrap;

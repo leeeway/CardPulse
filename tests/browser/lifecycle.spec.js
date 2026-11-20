@@ -1,3 +1,4 @@
+import { confirmStatementImport } from './import-preview.js';
 import { test, expect } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import {
@@ -104,6 +105,7 @@ test('deleting the only unsaved import returns to a clean empty workspace', asyn
       'day,description,amount,currency,direction\n2026-10-01,EXAMPLE,100.00,CNY,debit',
     ),
   });
+  await confirmStatementImport(page);
   await expect(page.locator('tbody tr')).toHaveCount(1);
   await page.getByText('查看结单与对账', { exact: false }).click();
   page.once('dialog', (dialog) => dialog.accept());

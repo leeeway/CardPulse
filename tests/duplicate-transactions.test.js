@@ -1,6 +1,9 @@
 import { it } from 'node:test';
 import assert from 'node:assert/strict';
-import { findPotentialDuplicates } from '../src/core/duplicate-transactions.js';
+import {
+  findImportDuplicates,
+  findPotentialDuplicates,
+} from '../src/core/duplicate-transactions.js';
 const statements = [
   { id: 's1', fileName: 'a.csv' },
   { id: 's2', fileName: 'b.csv' },
@@ -62,6 +65,33 @@ it('跨结单按标准化证据分组，保留每份结单内所有记录，不�
     findPotentialDuplicates(transactions.slice(0, 2), statements).groups.length,
     0,
   );
+});
+it('导入预览仅报告涉及待导入来源的组，包括本批文件之间的重叠', () => {
+  const transaction = (source, index, description) =>
+    tx({ id: `${source}:${index}`, statementId: source, description });
+  const workspace = {
+    statements: [...statements, { id: 's3' }, { id: 's4' }],
+    transactions: [
+      transaction('s1', 0, 'Historical'),
+      transaction('s2', 0, 'Historical'),
+      transaction('s1', 1, 'Existing overlap'),
+      transaction('s3', 0, 'Existing overlap'),
+      transaction('s3', 1, 'New overlap'),
+      transaction('s4', 0, 'New overlap'),
+    ],
+  };
+  const original = structuredClone(workspace);
+  const groups = findImportDuplicates(workspace, new Set(['s3', 's4']));
+  assert.deepEqual(
+    groups.map(({ entries }) =>
+      entries.map(({ statementNumber }) => statementNumber),
+    ),
+    [
+      [1, 3],
+      [3, 4],
+    ],
+  );
+  assert.deepEqual(workspace, original);
 });
 it('银行、卡片、末四位、日期、币种、方向、金额或描述不同不会合并', () => {
   for (const patch of [

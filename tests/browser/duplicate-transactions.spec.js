@@ -1,3 +1,4 @@
+import { confirmStatementImport } from './import-preview.js';
 import { test, expect } from '@playwright/test';
 const button = (parent, name) =>
   parent.getByRole('button', { name, exact: true });
@@ -17,6 +18,7 @@ test('cross-statement warnings preserve records, support review, ignore table fi
         'day,description,amount,currency,direction\n' + rows.join('\n'),
       ),
     });
+    await confirmStatementImport(page);
     await expect(
       page.getByText(`${name}：已导入 ${rows.length} 笔交易`, { exact: true }),
     ).toBeVisible();
@@ -120,6 +122,7 @@ test('overlap groups and large groups both paginate without rendering every reco
         'day,description,amount,currency,direction\n' + records.join('\n'),
       ),
     });
+    await confirmStatementImport(page);
     await expect(
       page.getByText(`${name}：已导入 36 笔交易`, { exact: true }),
     ).toBeVisible();

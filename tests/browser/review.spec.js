@@ -1,3 +1,4 @@
+import { confirmStatementImport } from './import-preview.js';
 import { test, expect } from '@playwright/test';
 
 test('review recalculates rewards, persists history and removes only the selected statement', async ({
@@ -14,6 +15,7 @@ test('review recalculates rewards, persists history and removes only the selecte
     await page
       .locator('input[accept=".pdf,.csv"]')
       .setInputFiles({ name, mimeType: 'text/csv', buffer });
+    await confirmStatementImport(page);
     await expect(
       page.getByText(`${name}：已导入 1 笔交易`, { exact: true }),
     ).toBeVisible();

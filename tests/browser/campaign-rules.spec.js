@@ -1,3 +1,4 @@
+import { confirmStatementImport } from './import-preview.js';
 import { test, expect } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 
@@ -38,6 +39,7 @@ test('rule export, copying and previewed imports preserve originals and never in
       'day,description,amount,currency,direction,last4,channel\n2026-11-01,PRIVATE SHOP TRANSACTION,100.00,HKD,debit,1234,online',
     ),
   });
+  await confirmStatementImport(page);
   await button(page, '添加活动').click();
   const form = page.locator('.campaign-form');
   await form.getByLabel('活动名称', { exact: true }).fill('Original');

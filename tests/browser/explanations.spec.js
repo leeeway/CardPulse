@@ -1,3 +1,4 @@
+import { confirmStatementImport } from './import-preview.js';
 import { test, expect } from '@playwright/test';
 
 test('campaign explanations show caps, refunds, exclusions, pagination and updated review results', async ({
@@ -30,6 +31,7 @@ test('campaign explanations show caps, refunds, exclusions, pagination and updat
         rows.join('\n'),
     ),
   });
+  await confirmStatementImport(page);
   await expect(page.locator('tbody tr')).toHaveCount(32);
   await button('添加活动').click();
   const form = page.locator('.campaign-form');

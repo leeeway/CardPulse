@@ -1,3 +1,4 @@
+import { confirmStatementImport } from './import-preview.js';
 import { test, expect } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import { parseBackup, decryptWorkspace } from '../../src/core/backup.js';
@@ -13,6 +14,7 @@ async function importRow(page, name) {
       `day,description,amount,currency,direction\n2026-11-01,${name},100.00,CNY,debit`,
     ),
   });
+  await confirmStatementImport(page);
 }
 async function fillChange(page, current, next, confirmation = next) {
   const dialog = page.getByRole('dialog');

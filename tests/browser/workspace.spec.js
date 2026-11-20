@@ -1,3 +1,4 @@
+import { confirmStatementImport } from './import-preview.js';
 import { test } from '@playwright/test';
 import assert from 'node:assert/strict';
 import { makeStatementPdf } from './fixtures.js';
@@ -28,6 +29,7 @@ test('multi-bank workspace, custom rewards, preferences, and encrypted persisten
       mimeType: 'text/csv',
       buffer: Buffer.from(csv),
     });
+  await confirmStatementImport(page);
   await text('已导入 3 笔交易');
   assert.equal(await page.locator('tbody tr').count(), 3);
   await button('添加活动').click();
@@ -66,6 +68,7 @@ test('multi-bank workspace, custom rewards, preferences, and encrypted persisten
       mimeType: 'application/pdf',
       buffer: makeStatementPdf(),
     });
+  await confirmStatementImport(page);
   await text('plain.pdf：已导入 1 笔交易');
   assert.equal(await page.locator('.activity-card').count(), 1);
   assert.equal(await page.locator('tbody tr').count(), 4);

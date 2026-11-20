@@ -1,3 +1,4 @@
+import { confirmStatementImport } from './import-preview.js';
 import { test, expect } from '@playwright/test';
 
 const password = 'synthetic idle vault password';
@@ -11,6 +12,7 @@ async function importRow(page, name = 'IDLE SHOP') {
       `day,description,amount,currency,direction\n2026-11-01,${name},100.00,CNY,debit`,
     ),
   });
+  await confirmStatementImport(page);
 }
 async function save(page) {
   await button(page, '保存到加密库').click();

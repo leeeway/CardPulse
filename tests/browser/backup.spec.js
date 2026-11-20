@@ -1,3 +1,4 @@
+import { confirmStatementImport } from './import-preview.js';
 import { test, expect } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 test('offline by default and encrypted web backup migrates transactions and rates', async ({
@@ -31,6 +32,7 @@ test('offline by default and encrypted web backup migrates transactions and rate
         'day,description,amount,currency,direction\n2026-10-01,SYNTHETIC BACKUP SHOP,100.00,CNY,debit',
       ),
     });
+  await confirmStatementImport(page);
   await expect(page.locator('tbody tr')).toHaveCount(1);
   await button('保存到加密库').click();
   await page.getByLabel('主密码', { exact: true }).fill('web backup password');

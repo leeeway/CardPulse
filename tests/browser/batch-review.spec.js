@@ -1,3 +1,4 @@
+import { confirmStatementImport } from './import-preview.js';
 import { test, expect } from '@playwright/test';
 
 test('batch review previews and applies only selected transactions, preserves history, and clears selections on filter changes', async ({
@@ -16,6 +17,7 @@ test('batch review previews and applies only selected transactions, preserves hi
       'day,description,amount,currency,direction,category,channel\n2026-11-01,FIRST SHOP,100,CNY,debit,spend,standard\n2026-11-02,SECOND SHOP,200,CNY,debit,spend,standard\n2026-11-03,REFUND SHOP,25,CNY,credit,credit,standard',
     ),
   });
+  await confirmStatementImport(page);
   const rows = page.locator('.transactions-section tbody tr');
   await expect(rows).toHaveCount(3);
   const row = (merchant) => rows.filter({ hasText: merchant });

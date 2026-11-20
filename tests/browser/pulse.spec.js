@@ -1,3 +1,4 @@
+import { confirmStatementImport } from './import-preview.js';
 import { test, expect } from '@playwright/test';
 
 test('Pulse explanations reconcile annual and half-year pools and show missing FX correctly', async ({
@@ -27,6 +28,7 @@ test('Pulse explanations reconcile annual and half-year pools and show missing F
       mimeType: 'text/csv',
       buffer: Buffer.from(header + rows.join('\n')),
     });
+  await confirmStatementImport(page);
   await expect(page.locator('.transactions-section tbody tr')).toHaveCount(9);
   await page.getByLabel('导入银行', { exact: true }).selectOption('bochk');
   await page
@@ -38,6 +40,7 @@ test('Pulse explanations reconcile annual and half-year pools and show missing F
         header + '2026-10-01,OTHER BANK,100.00,CNY,debit,spend,standard',
       ),
     });
+  await confirmStatementImport(page);
   await expect(page.locator('.transactions-section tbody tr')).toHaveCount(10);
   const pulse = page.locator('.pulse-section');
   await expect(pulse).toContainText('缺少汇率，港币部分尚未折算');

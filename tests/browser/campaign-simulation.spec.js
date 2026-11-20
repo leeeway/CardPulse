@@ -1,3 +1,4 @@
+import { confirmStatementImport } from './import-preview.js';
 import { test, expect } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import { decryptData } from '../../src/core/crypto.js';
@@ -24,6 +25,7 @@ test('progressive refund scenarios show negative changes and refresh at Hong Kon
         'day,description,amount,currency,direction\n2026-11-01,SYNTHETIC DEBIT,1000,HKD,debit\n2026-11-10,SYNTHETIC REFUND,600,HKD,credit\n2026-11-12,SYNTHETIC FUTURE REFUND,100,HKD,credit',
       ),
     });
+  await confirmStatementImport(page);
   const rule = {
     name: 'Negative scenario',
     bankId: 'bochk',
@@ -99,6 +101,7 @@ test('spend simulations stay outside saved data and reports, react to edits, and
       'day,description,amount,currency,direction\n2026-11-01,PRIVATE EXISTING,900,HKD,debit\n2026-12-01,PRIVATE FUTURE,200,HKD,debit',
     ),
   });
+  await confirmStatementImport(page);
   await button(page, '添加活动').click();
   const form = page.locator('.campaign-form');
   await form.getByLabel('活动名称', { exact: true }).fill('Simulation example');

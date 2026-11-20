@@ -1,3 +1,4 @@
+import { confirmStatementImport } from './import-preview.js';
 import { test, expect } from '@playwright/test';
 
 test.use({ timezoneId: 'America/Los_Angeles' });
@@ -23,6 +24,7 @@ test('Hong Kong date rollover updates Pulse, campaign totals and open explanatio
         '2027-01-01,JANUARY,100.00,CNY,debit,spend,applePay',
     ),
   });
+  await confirmStatementImport(page);
   const button = (name) => page.getByRole('button', { name, exact: true });
   await button('添加活动').click();
   const form = page.locator('.campaign-form');

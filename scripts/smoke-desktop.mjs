@@ -4,6 +4,10 @@ import { mkdtemp, readFile, rm, mkdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { resolve, join } from 'node:path';
 import { makeEncryptedStatementPdf } from '../tests/browser/fixtures.js';
+import {
+  confirmStatementImport,
+  statementImportPreview,
+} from '../tests/browser/import-preview.js';
 import { parseBackup, decryptWorkspace } from '../src/core/backup.js';
 
 const profile = await mkdtemp(join(tmpdir(), 'cardpulse-desktop-'));
@@ -86,6 +90,15 @@ try {
   await page.getByText('结单密码错误', { exact: true }).waitFor();
   await page.locator('input[type="password"]').fill('pdf-password');
   await page.getByRole('button', { name: '继续解析', exact: true }).click();
+  const importPreview = statementImportPreview(page);
+  await importPreview
+    .getByText('native-statement.pdf', { exact: true })
+    .waitFor();
+  await importPreview
+    .getByText('待导入 1 份文件，共 1 笔交易。', { exact: true })
+    .waitFor();
+  assert.equal(await page.locator('tbody tr').count(), 0);
+  await confirmStatementImport(page);
   await page.getByText('已导入 1 笔交易', { exact: false }).waitFor();
   assert.equal(await page.locator('tbody tr').count(), 1);
   await page.getByRole('button', { name: '核对交易', exact: true }).click();
@@ -347,7 +360,7 @@ try {
   assert.equal(await page.getByLabel('空闲锁定时限').inputValue(), '5');
   assert.equal(await page.locator('tbody tr').count(), 0);
   console.log(
-    'PASS: Electron secure origin, isolated renderer, packaged PDF worker, offline startup/import, encrypted PDF password retry, native encrypted file, manual FX persistence, backup/export/restore, native backup confirmation and cancellation, password changes and old backup compatibility, Pulse calculation explanations, transaction review history, statement deletion, reload, full application restart, idle lock/unlock, and campaign rule imports.',
+    'PASS: Electron secure origin, isolated renderer, packaged PDF worker, offline startup/import, encrypted PDF password retry and import preview, native encrypted file, manual FX persistence, backup/export/restore, native backup confirmation and cancellation, password changes and old backup compatibility, Pulse calculation explanations, transaction review history, statement deletion, reload, full application restart, idle lock/unlock, and campaign rule imports.',
   );
 } finally {
   if (application) await application.close();

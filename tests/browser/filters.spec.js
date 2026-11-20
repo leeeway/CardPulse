@@ -1,3 +1,4 @@
+import { confirmStatementImport } from './import-preview.js';
 import { test, expect } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 
@@ -18,6 +19,7 @@ test('posting date filters include boundaries, combine with search, and limit CS
         'day,transactionDay,description,amount,currency,direction\n2026-09-30,2026-09-30,BEFORE,100.00,CNY,debit\n2026-10-01,2026-09-30,ON START,100.00,CNY,debit\n2026-10-19,2026-10-01,ON END,100.00,CNY,debit\n2026-10-20,2026-10-19,AFTER,100.00,CNY,debit',
       ),
     });
+  await confirmStatementImport(page);
   await expect(page.locator('tbody tr')).toHaveCount(4);
   const total = page.locator('.primary-reward .reward-card-value');
   const beforeTotal = await total.innerText();

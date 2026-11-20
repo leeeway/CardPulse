@@ -1,3 +1,4 @@
+import { confirmStatementImport } from './import-preview.js';
 import { test, expect } from '@playwright/test';
 
 test('batch undo restores previous reviews and rejects later edits, while imported state can be restored after unlocking', async ({
@@ -16,6 +17,7 @@ test('batch undo restores previous reviews and rejects later edits, while import
       'day,description,amount,currency,direction\n2026-11-01,FIRST SHOP,100,CNY,debit\n2026-11-02,SECOND SHOP,200,CNY,debit',
     ),
   });
+  await confirmStatementImport(page);
   const rows = page.locator('.transactions-section tbody tr');
   await expect(rows).toHaveCount(2);
   const first = rows.filter({ hasText: 'FIRST SHOP' });

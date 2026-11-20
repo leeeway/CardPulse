@@ -1,3 +1,4 @@
+import { confirmStatementImport } from './import-preview.js';
 import { test, expect } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 
@@ -26,6 +27,7 @@ test('statement cycles expose boundaries, survive encryption, and share through 
       ].join('\n'),
     ),
   });
+  await confirmStatementImport(page);
   await button(page, '添加活动').click();
   const form = page.locator('.campaign-form');
   await form.getByLabel('活动名称', { exact: true }).fill('Cycle example');

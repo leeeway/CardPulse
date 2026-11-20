@@ -68,6 +68,8 @@ import BackupReminder from './components/BackupReminder.jsx';
 import IdleLockSettings from './components/IdleLockSettings.jsx';
 import ChangePasswordDialog from './components/ChangePasswordDialog.jsx';
 import PdfPasswordDialog from './components/PdfPasswordDialog.jsx';
+import ImportPreviewDialog from './components/ImportPreviewDialog.jsx';
+import { findImportDuplicates } from './core/duplicate-transactions.js';
 import {
   encryptWorkspace,
   decryptWorkspace,
@@ -154,6 +156,7 @@ export default function App() {
   const [rateBusy, setRateBusy] = useState(false);
   const [pendingBackup, setPendingBackup] = useState(null);
   const [pdfPasswordRequest, setPdfPasswordRequest] = useState(null);
+  const [importPreview, setImportPreview] = useState(null);
   const [filters, setFilters] = useState(emptyFilters);
   const [reviewId, setReviewId] = useState(null);
   const [batchIds, setBatchIds] = useState(null);
@@ -176,7 +179,12 @@ export default function App() {
   const backupInputRef = useRef(null);
   const pdfPasswordResolver = useRef(null);
   const unavailable =
-    loadingFile || vaultBusy || rateBusy || vaultLocked || !vaultReady;
+    loadingFile ||
+    Boolean(importPreview) ||
+    vaultBusy ||
+    rateBusy ||
+    vaultLocked ||
+    !vaultReady;
   const idleLockActive = hasVault && vaultReady && !vaultLocked && !isDemo;
   const idleLockBlocked =
     dirty ||
@@ -187,6 +195,7 @@ export default function App() {
     Boolean(reviewId) ||
     batchReviewOpen ||
     Boolean(pdfPasswordRequest) ||
+    Boolean(importPreview) ||
     loadingFile ||
     vaultBusy ||
     rateBusy;
@@ -310,6 +319,7 @@ export default function App() {
     setShowPasswordModal(false);
     setShowChangePassword(false);
     setPendingBackup(null);
+    setImportPreview(null);
     setCampaignEditing(false);
     setRateEditing(false);
     setIsDragging(false);
@@ -368,12 +378,14 @@ export default function App() {
     const inputFiles = Array.from(files);
     busyRef.current = true;
     setLoadingFile(true);
-    setIsDemo(false);
-    setActiveBank('all');
-    const messages = [];
+    const results = [];
+    const pendingIds = new Set();
+    const existingIds = new Set(workspace.statements.map(({ id }) => id));
     let next = workspace;
     try {
       for (const file of inputFiles) {
+        const entry = { fileName: file.name, messages: [] };
+        results.push(entry);
         try {
           const isPdf = /\.pdf$/i.test(file.name),
             isCsv = /\.csv$/i.test(file.name);
@@ -386,8 +398,12 @@ export default function App() {
             bankId: selectedBank,
             cardId: selectedCard,
           });
-          if (next.statements.some((item) => item.id === fingerprint)) {
-            messages.push({ file: file.name, text: '已导入，跳过重复文件' });
+          if (existingIds.has(fingerprint)) {
+            entry.messages.push('已导入，跳过重复文件');
+            continue;
+          }
+          if (pendingIds.has(fingerprint)) {
+            entry.messages.push('与本批文件内容相同，已跳过');
             continue;
           }
           let result;
@@ -419,33 +435,68 @@ export default function App() {
             }
           }
           if (!result) {
-            messages.push({ file: file.name, text: '已取消' });
+            entry.messages.push('已取消');
             continue;
           }
           if (!result.transactions.length) {
-            result.warnings.forEach((text) =>
-              messages.push({ file: file.name, text }),
-            );
+            entry.messages = result.warnings;
             continue;
           }
           next = normalizeWorkspace(mergeStatement(next, result, fingerprint));
-          setWorkspace(next);
-          setDirty(true);
-          messages.push({
-            file: file.name,
-            text: '已导入 {count} 笔交易',
-            values: { count: result.transactions.length },
-          });
+          pendingIds.add(fingerprint);
+          entry.statement = next.statements.at(-1);
+          entry.statementNumber = next.statements.length;
         } catch (error) {
-          messages.push({ file: file.name, text: error.message });
+          entry.messages.push(error.message);
         }
       }
+      if (pendingIds.size) {
+        setImportPreview({
+          base: workspace,
+          next,
+          files: results,
+          pendingIds,
+          transactionCount:
+            next.transactions.length - workspace.transactions.length,
+          duplicates: findImportDuplicates(next, pendingIds),
+        });
+      } else {
+        setNotice(
+          results.flatMap(({ fileName, messages }) =>
+            messages.map((text) => ({ file: fileName, text })),
+          ),
+        );
+      }
     } finally {
-      setNotice(messages);
       setLoadingFile(false);
       busyRef.current = false;
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
+  };
+  const confirmImport = () => {
+    if (!importPreview || busyRef.current || vaultLocked) return;
+    setImportPreview(null);
+    if (workspace !== importPreview.base) {
+      setNotice([{ text: '工作区已变更，请重新选择文件以核对导入预览。' }]);
+      return;
+    }
+    setWorkspace(importPreview.next);
+    setDirty(true);
+    setIsDemo(false);
+    setActiveBank('all');
+    setNotice(
+      importPreview.files.flatMap(({ fileName, statement, messages }) =>
+        statement
+          ? [
+              {
+                file: fileName,
+                text: '已导入 {count} 笔交易',
+                values: { count: statement.transactionCount },
+              },
+            ]
+          : messages.map((text) => ({ file: fileName, text })),
+      ),
+    );
   };
   const handlePasswordSubmit = async (event) => {
     event?.preventDefault();
@@ -481,6 +532,7 @@ export default function App() {
         setWorkspaceSession((value) => value + 1);
         setReviewId(null);
         setLastBatchReview(null);
+        setImportPreview(null);
         setWorkspace(data);
         setHasVault(true);
         setVaultLocked(false);
@@ -1728,6 +1780,15 @@ export default function App() {
           request={pdfPasswordRequest}
           onResolve={resolvePdfPassword}
           t={t}
+        />
+      )}
+      {importPreview && (
+        <ImportPreviewDialog
+          preview={importPreview}
+          bankName={bankName}
+          t={t}
+          onClose={() => setImportPreview(null)}
+          onConfirm={confirmImport}
         />
       )}
     </div>

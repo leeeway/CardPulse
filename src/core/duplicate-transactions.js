@@ -71,3 +71,14 @@ export function findPotentialDuplicates(transactions, statements) {
     skippedCount: transactions.length - checkedCount,
   };
 }
+
+/** Report overlaps involving at least one statement from the pending import. */
+export function findImportDuplicates(workspace, pendingIds) {
+  const { groups } = findPotentialDuplicates(
+    workspace.transactions,
+    workspace.statements,
+  );
+  return groups.filter(({ entries }) =>
+    entries.some(({ statement }) => pendingIds.has(statement.id)),
+  );
+}

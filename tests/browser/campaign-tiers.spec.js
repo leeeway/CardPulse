@@ -1,3 +1,4 @@
+import { confirmStatementImport } from './import-preview.js';
 import { test, expect } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import { decryptData } from '../../src/core/crypto.js';
@@ -26,6 +27,7 @@ test('progressive campaigns calculate, share, copy and restore with explicit tie
       'day,description,amount,currency,direction\n2026-01-26,PRIVATE SYNTHETIC,2000,HKD,debit\n2026-02-25,PRIVATE REFUND,600,HKD,credit',
     ),
   });
+  await confirmStatementImport(page);
   await button(page, '添加活动').click();
   const form = page.locator('.campaign-form');
   await form

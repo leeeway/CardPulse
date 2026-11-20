@@ -1,3 +1,4 @@
+import { confirmStatementImport } from './import-preview.js';
 import { test, expect } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 
@@ -17,6 +18,7 @@ test('statement links and filters isolate same-name sources for table and CSV wh
         'day,description,amount,currency,direction\n' + rows.join('\n'),
       ),
     });
+    await confirmStatementImport(page);
     await expect(
       page.getByText(`${name}：已导入 ${rows.length} 笔交易`, { exact: true }),
     ).toBeVisible();
