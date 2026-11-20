@@ -29,6 +29,8 @@ import {
 import {
   reviewTransaction,
   reviewTransactions,
+  restoreImportedReview,
+  undoBatchReview,
   categoryText,
   MAX_BATCH_REVIEW,
 } from './core/review.js';
@@ -156,6 +158,7 @@ export default function App() {
   const [reviewId, setReviewId] = useState(null);
   const [batchIds, setBatchIds] = useState(null);
   const [batchReviewOpen, setBatchReviewOpen] = useState(false);
+  const [lastBatchReview, setLastBatchReview] = useState(null);
   const [vaultLocked, setVaultLocked] = useState(false);
   const [hasVault, setHasVault] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
@@ -297,6 +300,7 @@ export default function App() {
     setReviewId(null);
     setBatchIds(null);
     setBatchReviewOpen(false);
+    setLastBatchReview(null);
     setWorkspace(emptyWorkspace());
     setFilters(emptyFilters());
     setActiveBank('all');
@@ -476,6 +480,7 @@ export default function App() {
         backupReminder.invalidate('restored');
         setWorkspaceSession((value) => value + 1);
         setReviewId(null);
+        setLastBatchReview(null);
         setWorkspace(data);
         setHasVault(true);
         setVaultLocked(false);
@@ -564,6 +569,16 @@ export default function App() {
       setNotice([{ text: error.message }]);
     }
   };
+  const restoreReviewedTransaction = () => {
+    if (unavailable || isDemo || busyRef.current || !reviewTarget) return;
+    const updated = restoreImportedReview(workspace, reviewTarget.id);
+    if (updated !== workspace) {
+      setWorkspace(updated);
+      setDirty(true);
+      setNotice([{ text: '已恢复交易的导入状态，请保存到加密库。' }]);
+    }
+    setReviewId(null);
+  };
   const applyBatchReview = (preview) => {
     if (unavailable || isDemo || busyRef.current || workspace !== preview.base)
       throw new Error('工作区已变化，请重新预览');
@@ -576,6 +591,7 @@ export default function App() {
     const applied = reviewTransactions(workspace, preview.ids, preview.patch);
     if (!applied.changes.length) throw new Error('工作区已变化，请重新预览');
     setWorkspace(normalizeWorkspace(applied.workspace));
+    setLastBatchReview(applied.changes);
     setDirty(true);
     setBatchReviewOpen(false);
     setBatchIds(null);
@@ -585,6 +601,33 @@ export default function App() {
         values: { count: applied.changes.length },
       },
     ]);
+  };
+  const undoLastBatchReview = () => {
+    if (unavailable || isDemo || busyRef.current || !lastBatchReview) return;
+    const count = lastBatchReview.length;
+    try {
+      const updated = undoBatchReview(workspace, lastBatchReview);
+      if (
+        !confirm(
+          t(
+            '撤销上次批量修正的 {count} 笔交易？将恢复批次应用前的状态，并保留撤销记录。',
+            { count },
+          ),
+        )
+      )
+        return;
+      setWorkspace(updated);
+      setDirty(true);
+      setNotice([
+        {
+          text: '已撤销 {count} 笔批量修正，请保存到加密库。',
+          values: { count },
+        },
+      ]);
+    } catch (failure) {
+      setNotice([{ text: failure.message }]);
+    }
+    setLastBatchReview(null);
   };
   const deleteStatement = (statement) => {
     if (unavailable || isDemo || busyRef.current) return;
@@ -1382,16 +1425,28 @@ export default function App() {
             </div>
           </div>
         )}
-        {!isDemo && filteredList.length > 0 && (
+        {!isDemo && (filteredList.length > 0 || lastBatchReview) && (
           <div className="batch-review-controls">
-            <button
-              type="button"
-              className="btn btn-secondary"
-              disabled={unavailable}
-              onClick={() => setBatchIds(batchIds ? null : new Set())}
-            >
-              {t(batchIds ? '退出交易选择' : '选择交易')}
-            </button>
+            {filteredList.length > 0 && (
+              <button
+                type="button"
+                className="btn btn-secondary"
+                disabled={unavailable}
+                onClick={() => setBatchIds(batchIds ? null : new Set())}
+              >
+                {t(batchIds ? '退出交易选择' : '选择交易')}
+              </button>
+            )}
+            {lastBatchReview && (
+              <button
+                type="button"
+                className="btn btn-secondary"
+                disabled={unavailable}
+                onClick={undoLastBatchReview}
+              >
+                {t('撤销上次批量修正')}
+              </button>
+            )}
             {batchIds && (
               <>
                 <span className="muted small" aria-live="polite">
@@ -1650,6 +1705,7 @@ export default function App() {
           key={reviewTarget.id}
           transaction={reviewTarget}
           onSave={applyReview}
+          onRestoreImported={restoreReviewedTransaction}
           onClose={() => setReviewId(null)}
           t={t}
           locale={preferences.locale}

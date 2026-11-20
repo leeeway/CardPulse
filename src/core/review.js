@@ -47,14 +47,8 @@ function applyReview(transaction, { category, channel }, at) {
   const nextCategory = category === undefined ? transaction.category : category;
   const change = {
     at,
-    before: {
-      category: transaction.category ?? null,
-      channel: transaction.channel ? { ...transaction.channel } : null,
-    },
-    after: {
-      category: nextCategory ?? null,
-      channel: nextChannel ? { ...nextChannel } : null,
-    },
+    before: reviewSnapshot(transaction),
+    after: reviewSnapshot({ category: nextCategory, channel: nextChannel }),
   };
   return {
     ...transaction,
@@ -67,6 +61,67 @@ function applyReview(transaction, { category, channel }, at) {
 function validateReviewTime(at) {
   if (typeof at !== 'string' || !Number.isFinite(Date.parse(at)))
     throw new Error('修改时间无效');
+}
+
+function reviewSnapshot({ category, channel }) {
+  return {
+    category: category ?? null,
+    channel: channel ? { ...channel } : null,
+  };
+}
+
+function sameReviewState(left, right) {
+  if ((left.category ?? null) !== (right.category ?? null)) return false;
+  const a = left.channel ?? null;
+  const b = right.channel ?? null;
+  if (a === b) return true;
+  if (!a || !b) return false;
+  const keys = Object.keys(a);
+  return (
+    keys.length === Object.keys(b).length &&
+    keys.every((key) => Object.hasOwn(b, key) && Object.is(a[key], b[key]))
+  );
+}
+
+function restoreReviewState(transaction, target, at, action) {
+  const before = reviewSnapshot(transaction);
+  const after = reviewSnapshot(target);
+  return {
+    ...transaction,
+    ...after,
+    reviewHistory: [
+      ...transaction.reviewHistory,
+      { at, before, after, action },
+    ],
+  };
+}
+
+export function canRestoreImportedReview(transaction) {
+  const original = transaction.reviewHistory?.[0]?.before;
+  return Boolean(original && !sameReviewState(transaction, original));
+}
+
+export function restoreImportedReview(
+  workspace,
+  id,
+  at = new Date().toISOString(),
+) {
+  const transaction = workspace.transactions.find((tx) => tx.id === id);
+  if (!transaction) throw new Error('交易记录不存在');
+  validateReviewTime(at);
+  if (!canRestoreImportedReview(transaction)) return workspace;
+  const restored = restoreReviewState(
+    transaction,
+    transaction.reviewHistory[0].before,
+    at,
+    'restoreImported',
+  );
+  return {
+    ...workspace,
+    transactions: workspace.transactions.map((tx) =>
+      tx === transaction ? restored : tx,
+    ),
+  };
 }
 
 export function reviewTransaction(
@@ -118,4 +173,26 @@ export function reviewTransactions(
     workspace: changes.length ? { ...workspace, transactions } : workspace,
     changes,
   };
+}
+
+/** A session receipt can restore exactly the batch it produced, even after unrelated edits. */
+export function undoBatchReview(
+  workspace,
+  changes,
+  at = new Date().toISOString(),
+) {
+  validateReviewTime(at);
+  const byId = new Map(changes.map((change) => [change.after.id, change]));
+  let restored = 0;
+  const transactions = workspace.transactions.map((tx) => {
+    const change = byId.get(tx.id);
+    if (!change) return tx;
+    if (tx !== change.after)
+      throw new Error('上次批量修正涉及的交易已改动或删除，无法整批撤销。');
+    restored++;
+    return restoreReviewState(tx, change.before, at, 'undoBatch');
+  });
+  if (restored !== byId.size)
+    throw new Error('上次批量修正涉及的交易已改动或删除，无法整批撤销。');
+  return restored ? { ...workspace, transactions } : workspace;
 }

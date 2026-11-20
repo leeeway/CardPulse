@@ -5,6 +5,9 @@ import assert from 'node:assert/strict';
 import {
   reviewTransaction,
   reviewTransactions,
+  undoBatchReview,
+  restoreImportedReview,
+  canRestoreImportedReview,
   categoryText,
 } from '../src/core/review.js';
 import { previewReviewRewards } from '../src/core/review-rewards.js';
@@ -35,6 +38,97 @@ const data = () => ({ ...emptyWorkspace(), transactions: [tx()] });
 const options = { today: '2026-10-18' };
 const reward = (workspace) =>
   fromScaledBigInt(calculateRewards(workspace.transactions, options).totalCny);
+
+it('整批撤销恢复各笔先前状态和奖赏，保留其后对无关交易的修改', () => {
+  const first = tx({
+    channel: { key: 'applePay', label: '原备注', uncertain: true, pulse: true },
+  });
+  const second = tx({ id: 't2', category: 'fee' });
+  const original = {
+    ...data(),
+    transactions: [first, second, tx({ id: 'other' })],
+  };
+  const { workspace, changes } = reviewTransactions(original, ['t1', 't2'], {
+    category: 'spend',
+    channel: 'exclude',
+  });
+  const withIndependentEdit = reviewTransaction(workspace, 'other', {
+    category: 'fee',
+    channel: 'online',
+  });
+  const undone = undoBatchReview(withIndependentEdit, changes);
+  assert.deepEqual(undone.transactions[0].channel, first.channel);
+  assert.equal(undone.transactions[1].category, 'fee');
+  assert.equal(undone.transactions[2], withIndependentEdit.transactions[2]);
+  assert.ok(
+    undone.transactions
+      .slice(0, 2)
+      .every(
+        (tx) =>
+          tx.reviewHistory.length === 2 &&
+          tx.reviewHistory[1].action === 'undoBatch',
+      ),
+  );
+  assert.equal(reward(undone), '4.40');
+  assert.equal(workspace.transactions[0].channel.key, 'exclude');
+});
+
+it('涉及交易被删除或重改时整批拒绝，旧撤销记录不能重复应用', () => {
+  const original = { ...data(), transactions: [tx(), tx({ id: 't2' })] };
+  const { workspace, changes } = reviewTransactions(original, ['t1', 't2'], {
+    channel: 'exclude',
+  });
+  const edited = reviewTransaction(workspace, 't2', {
+    category: 'fee',
+    channel: 'standard',
+  });
+  const deleted = { ...workspace, transactions: [workspace.transactions[0]] };
+  for (const current of [
+    edited,
+    deleted,
+    undoBatchReview(workspace, changes),
+  ]) {
+    assert.throws(() => undoBatchReview(current, changes), /已改动或删除/);
+  }
+  assert.equal(edited.transactions[0], workspace.transactions[0]);
+  assert.equal(edited.transactions[1].reviewHistory.length, 2);
+});
+
+it('从首次历史恢复缺省分类或渠道，原始记录和恢复历史可经加密备份往返', async () => {
+  const original = {
+    ...data(),
+    transactions: [tx({ category: undefined, channel: null })],
+  };
+  const updated = reviewTransaction(original, 't1', {
+    category: 'spend',
+    channel: 'applePay',
+  });
+  const reopened = await decryptWorkspace(
+    await encryptWorkspace(updated, 'test password'),
+    'test password',
+  );
+  assert.equal(canRestoreImportedReview(reopened.transactions[0]), true);
+  const restored = restoreImportedReview(reopened, 't1');
+  assert.equal(restored.transactions[0].category, null);
+  assert.equal(restored.transactions[0].channel, null);
+  assert.equal(restored.transactions[0].amount, '100.00');
+  assert.deepEqual(
+    restored.transactions[0].sources,
+    original.transactions[0].sources,
+  );
+  assert.equal(
+    restored.transactions[0].reviewHistory[1].action,
+    'restoreImported',
+  );
+  assert.equal(restoreImportedReview(restored, 't1'), restored);
+  assert.deepEqual(
+    await decryptWorkspace(
+      await encryptWorkspace(restored, 'test password'),
+      'test password',
+    ),
+    restored,
+  );
+});
 
 it('批次只修改指定字段并逐笔保留原始证据，重复选择或无变化不会重复写入日志', () => {
   const first = tx();

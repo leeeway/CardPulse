@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   categoriesFor,
   categoryText,
+  canRestoreImportedReview,
   REVIEW_CHANNELS,
 } from '../core/review.js';
 import { channelText } from '../core/i18n.js';
@@ -9,6 +10,7 @@ import { channelText } from '../core/i18n.js';
 export default function TransactionReviewDialog({
   transaction,
   onSave,
+  onRestoreImported,
   onClose,
   t,
   locale,
@@ -32,6 +34,7 @@ export default function TransactionReviewDialog({
   }, []);
   const describe = (snapshot) =>
     `${t(categoryText(snapshot.category))} · ${t(snapshot.channel?.uncertain ? '待确认渠道' : channelText(snapshot.channel?.key))}`;
+  const original = transaction.reviewHistory?.[0]?.before;
   return (
     <dialog
       ref={dialogRef}
@@ -113,12 +116,40 @@ export default function TransactionReviewDialog({
                   <time dateTime={change.at}>
                     {new Date(change.at).toLocaleString(locale)}
                   </time>
+                  {change.action === 'undoBatch' && (
+                    <span className="badge-tag">{t('撤销批量修正')}</span>
+                  )}
+                  {change.action === 'restoreImported' && (
+                    <span className="badge-tag">{t('恢复导入状态')}</span>
+                  )}
                   <p>
                     {describe(change.before)} → {describe(change.after)}
                   </p>
                 </li>
               ))}
             </ol>
+            {canRestoreImportedReview(transaction) && (
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => {
+                  if (
+                    confirm(
+                      t(
+                        '恢复到导入时的分类和渠道？\n当前：{current}\n导入时：{original}',
+                        {
+                          current: describe(transaction),
+                          original: describe(original),
+                        },
+                      ),
+                    )
+                  )
+                    onRestoreImported();
+                }}
+              >
+                {t('恢复导入状态')}
+              </button>
+            )}
           </details>
         )}
         <div className="form-actions">
