@@ -921,8 +921,273 @@ export default function App() {
     }
   };
 
+  const isMac = globalThis.cardpulseDesktop?.platform === 'darwin';
+  const themeLabel = t(isMac ? '配色' : '网站配色');
+  const settingsPanels = (
+    <>
+      <DataSettings
+        key={`rate-${workspaceSession}-${vaultLocked}-${isDemo}`}
+        rateInfo={rateInfo}
+        disabled={unavailable || isDemo}
+        rateBusy={rateBusy}
+        onApplyRate={applyRate}
+        onFetchRate={refreshRate}
+        onDraftChange={setRateEditing}
+        t={t}
+      />
+      <VaultSettings
+        disabled={unavailable || isDemo}
+        hasVault={hasVault}
+        onChangePassword={() => setShowChangePassword(true)}
+        t={t}
+      >
+        <IdleLockSettings
+          minutes={preferences.idleLockMinutes}
+          active={idleLockActive}
+          blocked={idleLockBlocked}
+          disabled={loadingFile || vaultBusy || rateBusy || !vaultReady}
+          onChange={(minutes) =>
+            setPreferences((previous) => ({
+              ...previous,
+              idleLockMinutes: minutes,
+            }))
+          }
+          t={t}
+        />
+        {!isDemo && !vaultLocked && (hasVault || workspaceHasData) && (
+          <BackupReminder
+            reminder={backupReminder}
+            today={today}
+            interval={preferences.backupReminderDays}
+            dirty={dirty}
+            disabled={unavailable}
+            onIntervalChange={(days) =>
+              setPreferences((previous) => ({
+                ...previous,
+                backupReminderDays: days,
+              }))
+            }
+            onExport={() => openPassword('backup')}
+            t={t}
+          />
+        )}
+      </VaultSettings>
+    </>
+  );
+  const campaignPanel = (
+    <CampaignPanel
+      key={`${workspaceSession}-${vaultLocked}-${isDemo}`}
+      today={today}
+      campaigns={visibleCampaigns}
+      transactions={isDemo ? [] : transactions}
+      onEditingChange={setCampaignEditing}
+      allCampaignNames={campaigns.map((campaign) => campaign.name)}
+      onImportRules={importCampaignRules}
+      onExportReport={(content) =>
+        download(
+          content,
+          `CardPulse-rewards-${getHongKongDate()}.csv`,
+          'text/csv;charset=utf-8',
+        )
+      }
+      onExportRules={(content) =>
+        download(
+          content,
+          `CardPulse-campaigns-${getHongKongDate()}.json`,
+          'application/json',
+        )
+      }
+      disabled={unavailable || isDemo}
+      bankName={bankName}
+      t={t}
+      onSave={(campaign) =>
+        mutateCampaigns((prev) =>
+          prev.some((c) => c.id === campaign.id)
+            ? prev.map((c) => (c.id === campaign.id ? campaign : c))
+            : [...prev, campaign],
+        )
+      }
+      onDelete={(id) =>
+        mutateCampaigns((prev) => prev.filter((c) => c.id !== id))
+      }
+    />
+  );
+  const importPanel = (
+    <section className="panel import-panel" aria-labelledby="import-heading">
+      <div className="section-heading">
+        <div>
+          <p className="eyebrow">LOCAL IMPORT</p>
+          <h2 id="import-heading">{t('导入结单与交易')}</h2>
+          <p>{t('HSBC 支持指定 PDF 布局；其他银行请使用标准 CSV。')}</p>
+        </div>
+        <button
+          className="btn btn-secondary"
+          onClick={() =>
+            download(
+              '\uFEFF' + CSV_TEMPLATE,
+              'CardPulse_Import_Template.csv',
+              'text/csv;charset=utf-8;',
+            )
+          }
+        >
+          <Download size={14} />
+          {t('下载 CSV 模板')}
+        </button>
+      </div>
+      <div className="import-options">
+        <label className="field">
+          <span>{t('导入银行')}</span>
+          <select
+            aria-label={t('导入银行')}
+            value={importBank}
+            disabled={unavailable}
+            onChange={(e) => {
+              setImportBank(e.target.value);
+              setImportCard(cardsFor(e.target.value)[0]);
+            }}
+          >
+            {BANKS.map((bank) => (
+              <option key={bank.id} value={bank.id}>
+                {bankName(bank)}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="field">
+          <span>{t('导入卡片')}</span>
+          <select
+            aria-label={t('导入卡片')}
+            value={importCard}
+            disabled={unavailable}
+            onChange={(e) => setImportCard(e.target.value)}
+          >
+            {cardsFor(importBank).map((id) => (
+              <option key={id} value={id}>
+                {t(cardName(id))}
+              </option>
+            ))}
+          </select>
+        </label>
+        <span className="badge-tag">
+          {t(getBank(importBank)?.pdf ? '支持 PDF / CSV' : '支持标准 CSV')}
+        </span>
+      </div>
+      <div
+        className={`dropzone ${isDragging ? 'active' : ''}`}
+        role="button"
+        tabIndex={unavailable ? -1 : 0}
+        aria-label={t('选择文件或拖入 PDF / CSV')}
+        aria-disabled={unavailable}
+        onDragOver={(e) => {
+          e.preventDefault();
+          setIsDragging(true);
+        }}
+        onDragLeave={() => setIsDragging(false)}
+        onDrop={(e) => {
+          e.preventDefault();
+          setIsDragging(false);
+          handleFiles(e.dataTransfer.files);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            if (!unavailable && !busyRef.current) fileInputRef.current?.click();
+          }
+        }}
+        onClick={() => {
+          if (!unavailable && !busyRef.current) fileInputRef.current?.click();
+        }}
+      >
+        <input
+          type="file"
+          ref={fileInputRef}
+          hidden
+          accept=".pdf,.csv"
+          multiple
+          disabled={unavailable}
+          onChange={(e) => handleFiles(e.target.files)}
+        />
+        <UploadCloud size={30} />
+        <strong>
+          {t(loadingFile ? '正在本地解析…' : '选择文件或拖入 PDF / CSV')}
+        </strong>
+        <p>{t('PDF 每份最多 25 MB / 200 页；CSV 每份最多 5 MB。')}</p>
+      </div>
+    </section>
+  );
+  const exportButton = activeTransactions.length > 0 && (
+    <button
+      className="btn btn-secondary"
+      disabled={invalidDateRange}
+      onClick={() =>
+        download(
+          exportToSafeCsv(filteredList, t, {
+            pulseAllocations: rewards.allocations,
+          }),
+          `CardPulse_${getHongKongDate()}.csv`,
+          'text/csv;charset=utf-8;',
+        )
+      }
+    >
+      <Download size={14} />
+      {t('导出 CSV')}
+    </button>
+  );
+  const resetFilters = (
+    <button
+      type="button"
+      className="btn btn-ghost"
+      onClick={() => setFilters(emptyFilters())}
+    >
+      {t('重置筛选')}
+    </button>
+  );
+  const dateFilters = (
+    <div className="date-filter" role="group" aria-label={t('按记账日期筛选')}>
+      <label>
+        <span>{t('记账起始日期')}</span>
+        <input
+          type="date"
+          aria-label={t('记账起始日期')}
+          value={filters.from}
+          max={filters.to || undefined}
+          aria-invalid={invalidDateRange}
+          aria-describedby={invalidDateRange ? 'date-filter-error' : undefined}
+          onChange={(event) =>
+            setFilters((prev) => ({
+              ...prev,
+              from: event.target.value,
+            }))
+          }
+        />
+      </label>
+      <label>
+        <span>{t('记账截止日期')}</span>
+        <input
+          type="date"
+          aria-label={t('记账截止日期')}
+          value={filters.to}
+          min={filters.from || undefined}
+          aria-invalid={invalidDateRange}
+          aria-describedby={invalidDateRange ? 'date-filter-error' : undefined}
+          onChange={(event) =>
+            setFilters((prev) => ({ ...prev, to: event.target.value }))
+          }
+        />
+      </label>
+      {!isMac && resetFilters}
+      <p className="muted small">
+        {t('筛选范围适用于交易列表和导出的 CSV。奖赏按银行范围内的记录估算。')}
+      </p>
+      {invalidDateRange && (
+        <p className="error" id="date-filter-error" role="alert">
+          {t('起始日期不能晚于结束日期')}
+        </p>
+      )}
+    </div>
+  );
   return (
-    <div className="app-container">
+    <div className={isMac ? 'app-container mac-workspace' : 'app-container'}>
       <header className="header">
         <div className="brand-wrapper">
           <div className="brand-logo">
@@ -940,6 +1205,14 @@ export default function App() {
             <p className="brand-subtitle">{t('本地信用卡工作区')}</p>
           </div>
         </div>
+        {isMac && (
+          <nav className="workspace-nav" aria-label={t('工作区导航')}>
+            <a href="#import-heading">{t('导入结单')}</a>
+            <a href="#transactions-heading">{t('交易记录')}</a>
+            <a href="#campaign-heading">{t('自定义活动')}</a>
+            <a href="#workspace-settings-heading">{t('设置')}</a>
+          </nav>
+        )}
         <div className="preferences">
           <label>
             {t('语言')}
@@ -955,9 +1228,9 @@ export default function App() {
             </select>
           </label>
           <label>
-            {t('网站配色')}
+            {themeLabel}
             <select
-              aria-label={t('网站配色')}
+              aria-label={themeLabel}
               value={preferences.theme}
               onChange={(e) =>
                 setPreferences((prev) => ({ ...prev, theme: e.target.value }))
@@ -975,7 +1248,9 @@ export default function App() {
       <div className="page-intro">
         <div>
           <p className="eyebrow">STATEMENTS, MADE CLEAR.</p>
-          <h1>{t('整理交易，核对结单，管理每一份奖赏。')}</h1>
+          <h1>
+            {t(isMac ? '交易工作区' : '整理交易，核对结单，管理每一份奖赏。')}
+          </h1>
         </div>
         <div className="header-actions">
           <input
@@ -1038,24 +1313,7 @@ export default function App() {
             <Eye size={14} />
             {t(isDemo ? '退出演示数据' : '查看示例数据')}
           </button>
-          {activeTransactions.length > 0 && (
-            <button
-              className="btn btn-secondary"
-              disabled={invalidDateRange}
-              onClick={() =>
-                download(
-                  exportToSafeCsv(filteredList, t, {
-                    pulseAllocations: rewards.allocations,
-                  }),
-                  `CardPulse_${getHongKongDate()}.csv`,
-                  'text/csv;charset=utf-8;',
-                )
-              }
-            >
-              <Download size={14} />
-              {t('导出 CSV')}
-            </button>
-          )}
+          {!isMac && exportButton}
           {(hasVault || workspaceHasData || activeTransactions.length > 0) && (
             <button
               className="btn btn-ghost"
@@ -1078,9 +1336,11 @@ export default function App() {
           {t(
             vaultLocked
               ? '本地保险库已锁定，请先解锁再导入。'
-              : dirty
-                ? '有未保存的修改，请保存到加密库。'
-                : '数据仅在本地处理。',
+              : isMac && isDemo
+                ? '正在查看示例数据。'
+                : dirty
+                  ? '有未保存的修改，请保存到加密库。'
+                  : '数据仅在本地处理。',
           )}
           {notice.map((item, index) => (
             <p key={index}>
@@ -1090,53 +1350,7 @@ export default function App() {
           ))}
         </div>
       </div>
-      <DataSettings
-        key={`rate-${workspaceSession}-${vaultLocked}-${isDemo}`}
-        rateInfo={rateInfo}
-        disabled={unavailable || isDemo}
-        rateBusy={rateBusy}
-        onApplyRate={applyRate}
-        onFetchRate={refreshRate}
-        onDraftChange={setRateEditing}
-        t={t}
-      />
-      <VaultSettings
-        disabled={unavailable || isDemo}
-        hasVault={hasVault}
-        onChangePassword={() => setShowChangePassword(true)}
-        t={t}
-      >
-        <IdleLockSettings
-          minutes={preferences.idleLockMinutes}
-          active={idleLockActive}
-          blocked={idleLockBlocked}
-          disabled={loadingFile || vaultBusy || rateBusy || !vaultReady}
-          onChange={(minutes) =>
-            setPreferences((previous) => ({
-              ...previous,
-              idleLockMinutes: minutes,
-            }))
-          }
-          t={t}
-        />
-        {!isDemo && !vaultLocked && (hasVault || workspaceHasData) && (
-          <BackupReminder
-            reminder={backupReminder}
-            today={today}
-            interval={preferences.backupReminderDays}
-            dirty={dirty}
-            disabled={unavailable}
-            onIntervalChange={(days) =>
-              setPreferences((previous) => ({
-                ...previous,
-                backupReminderDays: days,
-              }))
-            }
-            onExport={() => openPassword('backup')}
-            t={t}
-          />
-        )}
-      </VaultSettings>
+      {!isMac && settingsPanels}
       <BankWorkspace
         selected={activeBank}
         onSelect={selectBank}
@@ -1144,6 +1358,7 @@ export default function App() {
         bankName={bankName}
         t={t}
       />
+      {isMac && importPanel}
       {showPulse && (
         <section aria-label={t('Pulse 内置估算')} className="pulse-section">
           <div className="section-heading compact">
@@ -1206,144 +1421,8 @@ export default function App() {
           </p>
         </section>
       )}
-      <CampaignPanel
-        key={`${workspaceSession}-${vaultLocked}-${isDemo}`}
-        today={today}
-        campaigns={visibleCampaigns}
-        transactions={isDemo ? [] : transactions}
-        onEditingChange={setCampaignEditing}
-        allCampaignNames={campaigns.map((campaign) => campaign.name)}
-        onImportRules={importCampaignRules}
-        onExportReport={(content) =>
-          download(
-            content,
-            `CardPulse-rewards-${getHongKongDate()}.csv`,
-            'text/csv;charset=utf-8',
-          )
-        }
-        onExportRules={(content) =>
-          download(
-            content,
-            `CardPulse-campaigns-${getHongKongDate()}.json`,
-            'application/json',
-          )
-        }
-        disabled={unavailable || isDemo}
-        bankName={bankName}
-        t={t}
-        onSave={(campaign) =>
-          mutateCampaigns((prev) =>
-            prev.some((c) => c.id === campaign.id)
-              ? prev.map((c) => (c.id === campaign.id ? campaign : c))
-              : [...prev, campaign],
-          )
-        }
-        onDelete={(id) =>
-          mutateCampaigns((prev) => prev.filter((c) => c.id !== id))
-        }
-      />
-      <section className="panel import-panel" aria-labelledby="import-heading">
-        <div className="section-heading">
-          <div>
-            <p className="eyebrow">LOCAL IMPORT</p>
-            <h2 id="import-heading">{t('导入结单与交易')}</h2>
-            <p>{t('HSBC 支持指定 PDF 布局；其他银行请使用标准 CSV。')}</p>
-          </div>
-          <button
-            className="btn btn-secondary"
-            onClick={() =>
-              download(
-                '\uFEFF' + CSV_TEMPLATE,
-                'CardPulse_Import_Template.csv',
-                'text/csv;charset=utf-8;',
-              )
-            }
-          >
-            <Download size={14} />
-            {t('下载 CSV 模板')}
-          </button>
-        </div>
-        <div className="import-options">
-          <label className="field">
-            <span>{t('导入银行')}</span>
-            <select
-              aria-label={t('导入银行')}
-              value={importBank}
-              disabled={unavailable}
-              onChange={(e) => {
-                setImportBank(e.target.value);
-                setImportCard(cardsFor(e.target.value)[0]);
-              }}
-            >
-              {BANKS.map((bank) => (
-                <option key={bank.id} value={bank.id}>
-                  {bankName(bank)}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="field">
-            <span>{t('导入卡片')}</span>
-            <select
-              aria-label={t('导入卡片')}
-              value={importCard}
-              disabled={unavailable}
-              onChange={(e) => setImportCard(e.target.value)}
-            >
-              {cardsFor(importBank).map((id) => (
-                <option key={id} value={id}>
-                  {t(cardName(id))}
-                </option>
-              ))}
-            </select>
-          </label>
-          <span className="badge-tag">
-            {t(getBank(importBank)?.pdf ? '支持 PDF / CSV' : '支持标准 CSV')}
-          </span>
-        </div>
-        <div
-          className={`dropzone ${isDragging ? 'active' : ''}`}
-          role="button"
-          tabIndex={unavailable ? -1 : 0}
-          aria-label={t('选择文件或拖入 PDF / CSV')}
-          aria-disabled={unavailable}
-          onDragOver={(e) => {
-            e.preventDefault();
-            setIsDragging(true);
-          }}
-          onDragLeave={() => setIsDragging(false)}
-          onDrop={(e) => {
-            e.preventDefault();
-            setIsDragging(false);
-            handleFiles(e.dataTransfer.files);
-          }}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault();
-              if (!unavailable && !busyRef.current)
-                fileInputRef.current?.click();
-            }
-          }}
-          onClick={() => {
-            if (!unavailable && !busyRef.current) fileInputRef.current?.click();
-          }}
-        >
-          <input
-            type="file"
-            ref={fileInputRef}
-            hidden
-            accept=".pdf,.csv"
-            multiple
-            disabled={unavailable}
-            onChange={(e) => handleFiles(e.target.files)}
-          />
-          <UploadCloud size={30} />
-          <strong>
-            {t(loadingFile ? '正在本地解析…' : '选择文件或拖入 PDF / CSV')}
-          </strong>
-          <p>{t('PDF 每份最多 25 MB / 200 页；CSV 每份最多 5 MB。')}</p>
-        </div>
-      </section>
+      {!isMac && campaignPanel}
+      {!isMac && importPanel}
       {!isDemo && statements.length > 0 && (
         <details className="statement-status">
           <summary>
@@ -1454,9 +1533,12 @@ export default function App() {
           >
             {t('交易记录')}
           </h2>
-          <span className="muted small">
-            {t('{count} 笔交易', { count: filteredList.length })}
-          </span>
+          <div className="transaction-heading-actions">
+            <span className="muted small">
+              {t('{count} 笔交易', { count: filteredList.length })}
+            </span>
+            {isMac && exportButton}
+          </div>
         </div>
         {activeTransactions.length > 0 && (
           <div className="filter-bar">
@@ -1544,64 +1626,17 @@ export default function App() {
                 </option>
               ))}
             </select>
-            <div
-              className="date-filter"
-              role="group"
-              aria-label={t('按记账日期筛选')}
-            >
-              <label>
-                <span>{t('记账起始日期')}</span>
-                <input
-                  type="date"
-                  aria-label={t('记账起始日期')}
-                  value={filters.from}
-                  max={filters.to || undefined}
-                  aria-invalid={invalidDateRange}
-                  aria-describedby={
-                    invalidDateRange ? 'date-filter-error' : undefined
-                  }
-                  onChange={(event) =>
-                    setFilters((prev) => ({
-                      ...prev,
-                      from: event.target.value,
-                    }))
-                  }
-                />
-              </label>
-              <label>
-                <span>{t('记账截止日期')}</span>
-                <input
-                  type="date"
-                  aria-label={t('记账截止日期')}
-                  value={filters.to}
-                  min={filters.from || undefined}
-                  aria-invalid={invalidDateRange}
-                  aria-describedby={
-                    invalidDateRange ? 'date-filter-error' : undefined
-                  }
-                  onChange={(event) =>
-                    setFilters((prev) => ({ ...prev, to: event.target.value }))
-                  }
-                />
-              </label>
-              <button
-                type="button"
-                className="btn btn-ghost"
-                onClick={() => setFilters(emptyFilters())}
-              >
-                {t('重置筛选')}
-              </button>
-              <p className="muted small">
-                {t(
-                  '筛选范围适用于交易列表和导出的 CSV。奖赏按银行范围内的记录估算。',
-                )}
-              </p>
-              {invalidDateRange && (
-                <p className="error" id="date-filter-error" role="alert">
-                  {t('起始日期不能晚于结束日期')}
-                </p>
-              )}
-            </div>
+            {isMac ? (
+              <>
+                {resetFilters}
+                <details className="transaction-date-filters">
+                  <summary>{t('按记账日期筛选')}</summary>
+                  {dateFilters}
+                </details>
+              </>
+            ) : (
+              dateFilters
+            )}
           </div>
         )}
         {!isDemo && (filteredList.length > 0 || lastBatchReview) && (
@@ -1645,15 +1680,7 @@ export default function App() {
           </div>
         )}
         {showPulseEstimates && filteredList.length > 0 && (
-          <p className="muted small pulse-estimate-summary">
-            {t(
-              'Pulse 逐笔返现按本年度截至 {date} 的交易估算，金额以原币显示。渠道待确认时按识别结果估算。',
-              { date: today },
-            )}{' '}
-            {t(
-              '年度和半年额度按记账日期分配，同日沿用工作区顺序。退款按记账顺序扣回本年奖赏，保留已用消费额度。',
-            )}
-          </p>
+          <PulseEstimateMethod compact={isMac} today={today} t={t} />
         )}
         {filteredList.length ? (
           <div className="table-container">
@@ -1662,31 +1689,36 @@ export default function App() {
                 <tr>
                   {batchIds && <th scope="col">{t('选择')}</th>}
                   {[
-                    '日期',
+                    isMac ? '记账日期' : '日期',
                     '银行与卡片',
                     '商户与描述',
                     '渠道',
-                    '币种',
+                    ...(isMac ? [] : ['币种']),
                     '金额',
                   ].map((label) => (
                     <th key={label}>{t(label)}</th>
                   ))}
-                  {showPulseEstimates && (
-                    <>
+                  {showPulseEstimates &&
+                    (isMac ? (
                       <th scope="col" className="pulse-estimate-column">
-                        {t('适用返现比例')}
+                        {t('Pulse 返现')}
                       </th>
-                      <th scope="col" className="pulse-estimate-column">
-                        {t('封顶前返现估算')}
-                      </th>
-                      <th scope="col" className="pulse-estimate-column">
-                        {t('封顶后返现估算')}
-                      </th>
-                      <th scope="col" className="pulse-estimate-column">
-                        {t('退款扣回估算')}
-                      </th>
-                    </>
-                  )}
+                    ) : (
+                      <>
+                        <th scope="col" className="pulse-estimate-column">
+                          {t('适用返现比例')}
+                        </th>
+                        <th scope="col" className="pulse-estimate-column">
+                          {t('封顶前返现估算')}
+                        </th>
+                        <th scope="col" className="pulse-estimate-column">
+                          {t('封顶后返现估算')}
+                        </th>
+                        <th scope="col" className="pulse-estimate-column">
+                          {t('退款扣回估算')}
+                        </th>
+                      </>
+                    ))}
                   <th scope="col">{t('操作')}</th>
                 </tr>
               </thead>
@@ -1712,9 +1744,13 @@ export default function App() {
                     )}
                     <td>
                       <strong>{tx.day}</strong>
-                      <small>
-                        {t('交易日期')}：{tx.transactionDay || '—'}
-                      </small>
+                      {(!isMac ||
+                        (tx.transactionDay &&
+                          tx.transactionDay !== tx.day)) && (
+                        <small>
+                          {t('交易日期')}：{tx.transactionDay || '—'}
+                        </small>
+                      )}
                     </td>
                     <td>
                       <span
@@ -1722,8 +1758,15 @@ export default function App() {
                         style={{ background: getBank(bankOf(tx))?.color }}
                       />
                       {bankName(getBank(bankOf(tx)))}
-                      <small>
-                        {t(cardName(tx.ruleId))} ···· {tx.last4 || t('未知')}
+                      <small className="transaction-card">
+                        {t(
+                          cardName(
+                            isMac && isPulseTransaction(tx)
+                              ? 'hsbc_pulse'
+                              : tx.ruleId,
+                          ),
+                        )}{' '}
+                        ···· {tx.last4 || t('未知')}
                       </small>
                     </td>
                     <td>
@@ -1753,10 +1796,15 @@ export default function App() {
                         )}
                       </span>
                     </td>
-                    <td>{tx.currency}</td>
+                    {!isMac && <td>{tx.currency}</td>}
                     <td
                       className={`amount ${tx.direction === 'credit' ? 'text-credit' : ''}`}
                     >
+                      {isMac && (
+                        <span className="transaction-currency">
+                          {tx.currency}
+                        </span>
+                      )}
                       {tx.direction === 'credit' ? '−' : '+'}
                       {tx.amount}
                     </td>
@@ -1764,6 +1812,7 @@ export default function App() {
                       <PulseTransactionEstimate
                         transaction={tx}
                         allocation={rewards.allocations.get(tx.id)}
+                        compact={isMac}
                         today={today}
                         t={t}
                       />
@@ -1825,6 +1874,18 @@ export default function App() {
           </nav>
         )}
       </section>
+      {isMac && (
+        <>
+          {campaignPanel}
+          <section
+            className="workspace-settings"
+            aria-labelledby="workspace-settings-heading"
+          >
+            <h2 id="workspace-settings-heading">{t('设置')}</h2>
+            <div className="workspace-settings-grid">{settingsPanels}</div>
+          </section>
+        </>
+      )}
       <BuildInfo t={t} />
       <footer>
         <span>CardPulse</span>
@@ -1982,7 +2043,34 @@ export default function App() {
     </div>
   );
 }
-function PulseTransactionEstimate({ transaction, allocation, today, t }) {
+function PulseEstimateMethod({ compact, today, t }) {
+  const explanation = (
+    <p className="muted small pulse-estimate-summary">
+      {t(
+        'Pulse 逐笔返现按本年度截至 {date} 的交易估算，金额以原币显示。渠道待确认时按识别结果估算。',
+        { date: today },
+      )}{' '}
+      {t(
+        '年度和半年额度按记账日期分配，同日沿用工作区顺序。退款按记账顺序扣回本年奖赏，保留已用消费额度。',
+      )}
+    </p>
+  );
+  return compact ? (
+    <details className="transaction-reward-method">
+      <summary>{t('返现计算口径')}</summary>
+      {explanation}
+    </details>
+  ) : (
+    explanation
+  );
+}
+function PulseTransactionEstimate({
+  transaction,
+  allocation,
+  compact,
+  today,
+  t,
+}) {
   const excluded =
     !allocation && isPulseTransaction(transaction)
       ? estimatePulseTransaction(transaction, { today })
@@ -1996,6 +2084,40 @@ function PulseTransactionEstimate({ transaction, allocation, today, t }) {
       annual: fromScaledBigInt(allocation.annual),
       halfYear: fromScaledBigInt(allocation.halfYear),
     });
+  if (compact) {
+    return (
+      <td className="pulse-estimate-column transaction-reward">
+        {allocation ? (
+          <>
+            <span className="amount">
+              {transaction.currency}{' '}
+              {fromScaledBigInt(
+                refund ? -allocation.clawback : allocation.cashback,
+              )}
+            </span>
+            <span className="transaction-reward-rate">
+              {allocation.ratePercent.toFixed(1)}%
+            </span>
+            <details>
+              <summary>{t(refund ? '退款扣回估算' : '封顶后返现估算')}</summary>
+              <small>
+                {t('封顶前返现估算')} · {transaction.currency}{' '}
+                {fromScaledBigInt(allocation.beforeCapCashback)}
+              </small>
+              {components && <small>{components}</small>}
+            </details>
+          </>
+        ) : (
+          <>
+            <span className="muted">—</span>
+            {excluded?.reason && (
+              <small>{t(PULSE_REASONS[excluded.reason])}</small>
+            )}
+          </>
+        )}
+      </td>
+    );
+  }
   return (
     <>
       <td className="pulse-estimate-column">
