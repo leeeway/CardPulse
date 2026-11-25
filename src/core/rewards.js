@@ -14,6 +14,8 @@ const BONUS_PER_MILLE = 20n;
 
 const nonnegative = (val) => (val > 0n ? val : 0n);
 const minBigInt = (a, b) => (a < b ? a : b);
+const rewardAtRate = (amount, perMille) => (amount * perMille) / 1000n;
+const halfOfYear = (day) => (day.slice(5, 7) < '07' ? 0 : 1);
 
 export function toScaledBigInt(amountStr) {
   if (!amountStr) return 0n;
@@ -41,8 +43,11 @@ export function getHongKongDate(date = new Date()) {
  */
 function computePool(gross, refunds, cap) {
   const used = minBigInt(gross, cap);
-  const beforeRefund = (used * BONUS_PER_MILLE) / 1000n;
-  const clawback = minBigInt(beforeRefund, (refunds * BONUS_PER_MILLE) / 1000n);
+  const beforeRefund = rewardAtRate(used, BONUS_PER_MILLE);
+  const clawback = minBigInt(
+    beforeRefund,
+    rewardAtRate(refunds, BONUS_PER_MILLE),
+  );
   return {
     gross,
     cap,
@@ -62,7 +67,12 @@ function computePool(gross, refunds, cap) {
  */
 export function calculateRewards(
   transactions,
-  { today = getHongKongDate(), hkdCnyRate = null, overrides = {} } = {},
+  {
+    today = getHongKongDate(),
+    hkdCnyRate = null,
+    overrides = {},
+    allocateTransactions = false,
+  } = {},
 ) {
   const year = today.slice(0, 4);
   const midYear = `${year}-07-01`;
@@ -78,12 +88,20 @@ export function calculateRewards(
 
   let includedCount = 0;
   let pendingCount = 0;
+  const matchedTransactions = allocateTransactions ? [] : null;
 
   for (const tx of transactions) {
     const match = matchPulseTransaction(tx, today, overrides);
     if (match.pending) pendingCount++;
     if (!match.included) continue;
     const { amount, isCredit, isPulseEligible, refundBaseOnly } = match;
+    matchedTransactions?.push({
+      transaction: tx,
+      amount,
+      isCredit,
+      isPulseEligible,
+      refundBaseOnly,
+    });
 
     includedCount++;
 
@@ -104,16 +122,21 @@ export function calculateRewards(
         cnyGross += amount;
         if (isPulseEligible) {
           pulseGross += amount;
-          const halfIdx = tx.day < midYear ? 0 : 1;
-          pulseHalfSpend[halfIdx] += amount;
+          pulseHalfSpend[halfOfYear(tx.day)] += amount;
         }
       }
     }
   }
 
   // 基础返现：0.4%
-  const cnyBase = (nonnegative(cnyGross - cnyRefunds) * BASE_PER_MILLE) / 1000n;
-  const hkdBase = (nonnegative(hkdGross - hkdRefunds) * BASE_PER_MILLE) / 1000n;
+  const cnyBase = rewardAtRate(
+    nonnegative(cnyGross - cnyRefunds),
+    BASE_PER_MILLE,
+  );
+  const hkdBase = rewardAtRate(
+    nonnegative(hkdGross - hkdRefunds),
+    BASE_PER_MILLE,
+  );
 
   const validRate =
     typeof hkdCnyRate === 'number' &&
@@ -148,7 +171,7 @@ export function calculateRewards(
   );
   const pulseClawback = minBigInt(
     pulseBeforeRefund,
-    (pulseRefunds * BONUS_PER_MILLE) / 1000n,
+    rewardAtRate(pulseRefunds, BONUS_PER_MILLE),
   );
   const pulse = {
     ...periods[halfIdx],
@@ -166,7 +189,7 @@ export function calculateRewards(
       ? null
       : baseTotalCny + world.cashback + pulse.cashback;
 
-  return {
+  const result = {
     today,
     year,
     includedCount,
@@ -185,6 +208,90 @@ export function calculateRewards(
     pulse,
     totalCny,
   };
+  return matchedTransactions
+    ? {
+        ...result,
+        allocations: allocatePulseTransactions(matchedTransactions, result),
+      }
+    : result;
+}
+
+// Each row gets the change in a pool's cumulative reward at full precision.
+function allocateByAmount(rewardForTotal) {
+  let total = 0n;
+  let previous = 0n;
+  return (amount) => {
+    total += amount;
+    const next = rewardForTotal(total);
+    const allocated = next - previous;
+    previous = next;
+    return allocated;
+  };
+}
+
+function allocatePulseTransactions(matchedTransactions, result) {
+  const spend = (used, rate) =>
+    allocateByAmount((total) => rewardAtRate(minBigInt(used, total), rate));
+  const baseRefund = (gross) => {
+    const grossReward = rewardAtRate(gross, BASE_PER_MILLE);
+    return allocateByAmount(
+      (total) =>
+        grossReward - rewardAtRate(nonnegative(gross - total), BASE_PER_MILLE),
+    );
+  };
+  const bonusRefund = (clawback) =>
+    allocateByAmount((total) =>
+      minBigInt(clawback, rewardAtRate(total, BONUS_PER_MILLE)),
+    );
+
+  const baseSpends = {
+    CNY: spend(result.base.cnyGross, BASE_PER_MILLE),
+    HKD: spend(result.base.hkdGross, BASE_PER_MILLE),
+  };
+  const baseRefunds = {
+    CNY: baseRefund(result.base.cnyGross),
+    HKD: baseRefund(result.base.hkdGross),
+  };
+  const annualSpend = spend(result.world.used, BONUS_PER_MILLE);
+  const annualRefund = bonusRefund(result.world.clawback);
+  const halfYearSpends = result.pulse.periods.map(({ used }) =>
+    spend(used, BONUS_PER_MILLE),
+  );
+  const halfYearRefund = bonusRefund(result.pulse.clawback);
+
+  // A stable sort keeps the workspace order for records with the same posting date.
+  matchedTransactions.sort((left, right) =>
+    left.transaction.day.localeCompare(right.transaction.day),
+  );
+  const allocations = new Map();
+  for (const {
+    transaction,
+    amount,
+    isCredit,
+    isPulseEligible,
+    refundBaseOnly,
+  } of matchedTransactions) {
+    const { id, currency, day } = transaction;
+    const base = (isCredit ? baseRefunds : baseSpends)[currency](amount);
+    const eligibleForBonus =
+      currency === 'CNY' && !(isCredit && refundBaseOnly);
+    const annual = eligibleForBonus
+      ? (isCredit ? annualRefund : annualSpend)(amount)
+      : 0n;
+    const halfYear =
+      eligibleForBonus && isPulseEligible
+        ? (isCredit ? halfYearRefund : halfYearSpends[halfOfYear(day)])(amount)
+        : 0n;
+    const total = base + annual + halfYear;
+    allocations.set(id, {
+      base,
+      annual,
+      halfYear,
+      cashback: isCredit ? 0n : total,
+      clawback: isCredit ? total : 0n,
+    });
+  }
+  return allocations;
 }
 
 export const PULSE_REASONS = {
@@ -255,7 +362,7 @@ function matchPulseTransaction(tx, today, overrides) {
     day: tx.day,
     period:
       tx.currency === 'CNY' && isPulseEligible && !isCredit
-        ? `${year}-H${tx.day.slice(5, 7) < '07' ? 1 : 2}`
+        ? `${year}-H${halfOfYear(tx.day) + 1}`
         : year,
     amount,
     isCredit,
@@ -287,7 +394,7 @@ export function estimatePulseTransaction(
         : 1n
       : 0n;
   const perMille = BASE_PER_MILLE + bonuses * BONUS_PER_MILLE;
-  const cashback = (amount * perMille) / 1000n;
+  const cashback = rewardAtRate(amount, perMille);
   return {
     included,
     ratePercent: Number(perMille) / 10,

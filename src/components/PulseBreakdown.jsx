@@ -120,6 +120,7 @@ export default function PulseBreakdown({ result, transactions, rate, t }) {
         matchedCount={result.includedCount}
         reasonLabels={PULSE_REASONS}
         title="Pulse 逐笔说明"
+        description="排除记录显示首个不满足的条件。逐笔封顶后返现及退款扣回可在交易列表查看。"
         t={t}
       />
     </div>

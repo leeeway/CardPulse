@@ -46,20 +46,36 @@ test('Pulse explanations reconcile annual and half-year pools and show missing F
   await expect(
     ledger.getByRole('columnheader', { name: '封顶前返现估算' }),
   ).toBeVisible();
+  await expect(
+    ledger.getByRole('columnheader', { name: '封顶后返现估算' }),
+  ).toBeVisible();
+  await expect(
+    ledger.getByRole('columnheader', { name: '退款扣回估算' }),
+  ).toBeVisible();
   const estimate = (merchant) =>
     ledger
       .getByRole('row')
       .filter({ hasText: merchant })
       .locator('td.pulse-estimate-column');
-  await expect(estimate('FIRST HALF')).toHaveText(['4.4%', 'CNY 3520.00']);
-  await expect(estimate('REFUND')).toHaveText(['4.4%', 'CNY -440.00']);
-  await expect(estimate('STANDARD SHOP')).toHaveText(['2.4%', 'CNY 2.40']);
-  await expect(estimate('HKD SHOP')).toHaveText(['0.4%', 'HKD 4.00']);
-  await expect(estimate('FEE').last()).toContainText('还款或费用不计奖赏');
+  const expectUncapped = async (merchant, rate, amount) => {
+    await expect(estimate(merchant).first()).toHaveText(rate);
+    await expect(estimate(merchant).nth(1)).toHaveText(amount);
+  };
+  await expectUncapped('FIRST HALF', '4.4%', 'CNY 3520.00');
+  await expect(estimate('FIRST HALF').nth(2)).toContainText('CNY 3520.00');
+  await expect(estimate('FIRST HALF').nth(2)).toContainText(
+    '基础 320.00 · 年度 1600.00 · 半年 1600.00',
+  );
+  await expectUncapped('REFUND', '4.4%', 'CNY -440.00');
+  await expect(estimate('REFUND').nth(2)).toHaveText('—');
+  await expect(estimate('REFUND').last()).toContainText('CNY -440.00');
+  await expectUncapped('STANDARD SHOP', '2.4%', 'CNY 2.40');
+  await expectUncapped('HKD SHOP', '0.4%', 'HKD 4.00');
+  await expect(estimate('FEE').nth(1)).toContainText('还款或费用不计奖赏');
   await expect(estimate('PAYMENT').first()).toHaveText('—');
-  await expect(estimate('EXCLUDED').last()).toContainText('已设为不计奖赏');
-  await expect(estimate('FUTURE').last()).toContainText('不在本年度估算日期内');
-  await expect(estimate('OTHER BANK')).toHaveText(['—', '—']);
+  await expect(estimate('EXCLUDED').nth(1)).toContainText('已设为不计奖赏');
+  await expect(estimate('FUTURE').nth(1)).toContainText('不在本年度估算日期内');
+  await expect(estimate('OTHER BANK')).toHaveText(['—', '—', '—', '—']);
   const pulse = page.locator('.pulse-section');
   await expect(pulse).toContainText('缺少汇率，港币部分尚未折算');
   await pulse.getByText('Pulse 计算明细', { exact: true }).click();
@@ -94,7 +110,7 @@ test('Pulse explanations reconcile annual and half-year pools and show missing F
     pulse.locator('.primary-reward .reward-card-value'),
   ).toContainText('3526.12');
   await expect(breakdown).toContainText('CNY 3.72');
-  await expect(estimate('HKD SHOP')).toHaveText(['0.4%', 'HKD 4.00']);
+  await expect(estimate('HKD SHOP').nth(2)).toHaveText('HKD 4.00');
   await page.getByLabel('搜索商户、卡号或备注').fill('STANDARD SHOP');
   await page
     .locator('.transactions-section tbody tr')
@@ -108,13 +124,14 @@ test('Pulse explanations reconcile annual and half-year pools and show missing F
   await expect(
     pulse.locator('.primary-reward .reward-card-value'),
   ).toContainText('3528.12');
-  await expect(estimate('STANDARD SHOP')).toHaveText(['4.4%', 'CNY 4.40']);
+  await expectUncapped('STANDARD SHOP', '4.4%', 'CNY 4.40');
+  await expect(estimate('STANDARD SHOP').nth(2)).toContainText('CNY 4.40');
   await page.getByLabel('语言', { exact: true }).selectOption('zh-TW');
   await expect(
     pulse.getByText('Pulse 計算明細', { exact: true }),
   ).toBeVisible();
   await expect(
-    ledger.getByRole('columnheader', { name: '設限前回贈估算' }),
+    ledger.getByRole('columnheader', { name: '設限後回贈估算' }),
   ).toBeVisible();
   await page.setViewportSize({ width: 390, height: 844 });
   await page.screenshot({
@@ -142,7 +159,7 @@ test('Pulse ledger pages filtered rows, preserves selections and exports across 
     (_, index) =>
       `2026-10-01,REPORT ${String(index + 1).padStart(2, '0')},100.00,CNY,debit,spend,applePay`,
   );
-  purchases.push('2026-10-01,SKIP THIS,100.00,CNY,debit,spend,applePay');
+  purchases.push('2026-01-01,SKIP THIS,100000.00,CNY,debit,spend,applePay');
   await input.setInputFiles({
     name: 'many-pulse.csv',
     mimeType: 'text/csv',
@@ -163,6 +180,12 @@ test('Pulse ledger pages filtered rows, preserves selections and exports across 
   await rows.filter({ hasText: 'REPORT 01' }).getByRole('checkbox').check();
   await next.click();
   await expect(rows).toHaveCount(3);
+  const capped = rows
+    .filter({ hasText: 'REPORT 27' })
+    .locator('td.pulse-estimate-column')
+    .nth(2);
+  await expect(capped).toContainText('CNY 2.40');
+  await expect(capped).toContainText('基础 0.40 · 年度 0.00 · 半年 2.00');
   await expect(next).toBeDisabled();
   await rows.filter({ hasText: 'REPORT 27' }).getByRole('checkbox').check();
   await expect(ledger).toContainText('已选 2 笔交易');
@@ -181,6 +204,7 @@ test('Pulse ledger pages filtered rows, preserves selections and exports across 
   await expect(rows.getByRole('checkbox')).toHaveCount(0);
   await next.click();
   await expect(rows).toHaveCount(2);
+  await expect(capped).toContainText('CNY 2.40');
   const downloaded = page.waitForEvent('download');
   await page.getByRole('button', { name: '导出 CSV', exact: true }).click();
   const content = await readFile(await (await downloaded).path(), 'utf8');

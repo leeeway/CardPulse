@@ -169,6 +169,127 @@ it('Pulse 逐笔用原币和适用比例估算封顶前金额，退款显示扣�
   );
 });
 
+const pulseRow = (id, day, amount, changes = {}) => ({
+  id,
+  day,
+  amount,
+  direction: 'debit',
+  category: 'spend',
+  currency: 'CNY',
+  bankId: 'hsbc',
+  ruleId: 'hsbc_pulse',
+  channel: { key: 'applePay' },
+  ...changes,
+});
+
+it('消费按记账日期分配年度和两个独立半年额度，同日沿用工作区顺序', () => {
+  const rows = [
+    pulseRow('late', '2026-10-01', '50000.00'),
+    pulseRow('halfOnePartial', '2026-06-30', '40000.00'),
+    pulseRow('sameDay', '2026-06-30', '1000.00'),
+    pulseRow('early', '2026-01-01', '70000.00'),
+    pulseRow('halfTwo', '2026-07-01', '60000.00'),
+    pulseRow('hk', '2026-02-01', '1000.00', { currency: 'HKD' }),
+    pulseRow('future', '2026-11-01', '100.00'),
+  ];
+  const result = calculateRewards(rows, {
+    today: '2026-10-19',
+    allocateTransactions: true,
+  });
+  const components = (id) => {
+    const { base, annual, halfYear, cashback } = result.allocations.get(id);
+    return [base, annual, halfYear, cashback].map(fromScaledBigInt);
+  };
+  assert.deepEqual(components('early'), [
+    '280.00',
+    '1400.00',
+    '1400.00',
+    '3080.00',
+  ]);
+  assert.deepEqual(components('halfOnePartial'), [
+    '160.00',
+    '600.00',
+    '200.00',
+    '960.00',
+  ]);
+  assert.deepEqual(components('sameDay'), ['4.00', '0.00', '0.00', '4.00']);
+  assert.deepEqual(components('halfTwo'), [
+    '240.00',
+    '0.00',
+    '1200.00',
+    '1440.00',
+  ]);
+  assert.deepEqual(components('late'), ['200.00', '0.00', '400.00', '600.00']);
+  assert.deepEqual(components('hk'), ['4.00', '0.00', '0.00', '4.00']);
+  assert.equal(result.allocations.has('future'), false);
+  assert.equal(result.totalCny, null);
+  assert.equal(rows[0].id, 'late');
+});
+
+it('退款分项受已计奖金额限制且不回补额度，逐笔净额与原币汇总精确对应', () => {
+  const credit = { direction: 'credit', category: 'credit' };
+  const hkd = { currency: 'HKD' };
+  const rows = [
+    pulseRow('cny-spend', '2026-02-01', '100000.00'),
+    pulseRow('cny-july', '2026-07-01', '10000.00'),
+    pulseRow('cny-later-refund', '2026-08-02', '50000.00', credit),
+    pulseRow('cny-earlier-refund', '2026-02-02', '90000.00', credit),
+    pulseRow('base-only', '2026-01-01', '100.00', credit),
+    pulseRow('hkd-spend', '2026-02-01', '1000.00', hkd),
+    pulseRow('hkd-refund-first', '2026-02-02', '701.33', { ...credit, ...hkd }),
+    pulseRow('hkd-refund-last', '2026-03-02', '333.33', { ...credit, ...hkd }),
+  ];
+  const options = {
+    today: '2026-10-19',
+    overrides: { 'base-only': { refundBaseOnly: true } },
+  };
+  const result = calculateRewards(rows, {
+    ...options,
+    allocateTransactions: true,
+  });
+  const { allocations, ...summary } = result;
+  assert.deepEqual(summary, calculateRewards(rows, options));
+  const amounts = (id) => {
+    const { base, annual, halfYear, clawback } = allocations.get(id);
+    return [base, annual, halfYear, clawback].map(fromScaledBigInt);
+  };
+  assert.deepEqual(amounts('base-only'), ['0.40', '0.00', '0.00', '0.40']);
+  assert.deepEqual(amounts('cny-earlier-refund'), [
+    '360.00',
+    '1800.00',
+    '1800.00',
+    '3960.00',
+  ]);
+  assert.deepEqual(amounts('cny-later-refund'), [
+    '79.60',
+    '200.00',
+    '0.00',
+    '279.60',
+  ]);
+  assert.deepEqual(amounts('hkd-refund-last'), [
+    '1.19',
+    '0.00',
+    '0.00',
+    '1.19',
+  ]);
+  const net = (currency, field) =>
+    rows
+      .filter((row) => row.currency === currency)
+      .reduce(
+        (sum, row) =>
+          sum +
+          (row.direction === 'credit' ? -1n : 1n) *
+            allocations.get(row.id)[field],
+        0n,
+      );
+  assert.equal(net('HKD', 'base'), result.base.hkd);
+  assert.equal(net('CNY', 'base'), result.base.cny);
+  assert.equal(net('CNY', 'annual'), result.world.cashback);
+  assert.equal(net('CNY', 'halfYear'), result.pulse.cashback);
+  assert.equal(result.world.remaining, 0n);
+  assert.equal(result.pulse.periods[0].remaining, 0n);
+});
+
 it('退款扣回奖赏但不释放额度，7月刷新专属消费额度', () => {
   const tx = (id, day, amount, direction = 'debit') => ({
     id,

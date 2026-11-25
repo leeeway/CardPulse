@@ -67,7 +67,9 @@ Open the local address printed in your terminal, usually `http://localhost:5173`
 
 Filter by inclusive **posting-date ranges**, or reset all transaction filters. Date filters affect only the table and CSV export, without changing reward calculations. A reversed range shows an error and disables export. This feature is included starting with `v0.2.0-beta.3`.
 
-Bank views containing HSBC Pulse transactions show 25 rows per page (main branch). Selections carry across pages. CSV exports include every filtered row. Pulse rows show the applicable cashback rate and an estimate in the original currency before caps, with refunds shown as negative amounts. Estimates use the year-to-date Pulse rules. Open Pulse calculation details for period caps and aggregate refunds.
+Bank views containing HSBC Pulse transactions show 25 rows per page (main branch). Selections carry across pages. CSV exports include every filtered row. Pulse rows show the applicable cashback rate and before-cap estimate in the original currency. Purchases also show the capped estimate, and refunds show the allocated deduction as a negative amount.
+
+The annual and each half-year allowance are allocated independently in posting-date order, with workspace order breaking same-day ties. Refunds draw from earned year-to-date rewards in posting-date order, using the combined capped half-year bonus for that component. Spending allowances stay used after refunds. Allocations use all matched year-to-date records across pages and filters. Rounding to cents can cause display differences. Open Pulse calculation details for the summary.
 
 ### Transaction review and statement management
 

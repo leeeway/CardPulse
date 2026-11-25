@@ -7,6 +7,7 @@ export default function TransactionExplanations({
   reasonLabels,
   t,
   title = '逐笔计算说明',
+  description = '排除记录显示首个不满足的条件。奖赏按周期汇总，未向单笔交易分配封顶额度。',
 }) {
   const [open, setOpen] = useState(false);
   const [status, setStatus] = useState('all');
@@ -49,11 +50,7 @@ export default function TransactionExplanations({
               excluded: entries.length - matchedCount,
             })}
           </p>
-          <p className="muted small">
-            {t(
-              '排除记录显示首个不满足的条件。奖赏按周期汇总，未向单笔交易分配封顶额度。',
-            )}
-          </p>
+          <p className="muted small">{t(description)}</p>
           {excludedCounts.length > 0 && (
             <ul className="exclusion-summary">
               {excludedCounts.map(([reason, count]) => (

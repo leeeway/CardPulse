@@ -292,8 +292,12 @@ export default function App() {
     });
   const rewards = useMemo(
     () =>
-      calculateRewards(bankTransactions, { today, hkdCnyRate: rateInfo.rate }),
-    [bankTransactions, rateInfo.rate, today],
+      calculateRewards(bankTransactions, {
+        today,
+        hkdCnyRate: rateInfo.rate,
+        allocateTransactions: showPulseEstimates,
+      }),
+    [bankTransactions, rateInfo.rate, showPulseEstimates, today],
   );
   const invalidDateRange = Boolean(
     filters.from && filters.to && filters.from > filters.to,
@@ -1643,6 +1647,9 @@ export default function App() {
             {t(
               'Pulse 逐笔返现按本年度截至 {date} 的交易估算，金额以原币显示。渠道待确认时按识别结果估算。',
               { date: today },
+            )}{' '}
+            {t(
+              '年度和半年额度按记账日期分配，同日沿用工作区顺序。退款按记账顺序扣回本年奖赏，保留已用消费额度。',
             )}
           </p>
         )}
@@ -1669,6 +1676,12 @@ export default function App() {
                       </th>
                       <th scope="col" className="pulse-estimate-column">
                         {t('封顶前返现估算')}
+                      </th>
+                      <th scope="col" className="pulse-estimate-column">
+                        {t('封顶后返现估算')}
+                      </th>
+                      <th scope="col" className="pulse-estimate-column">
+                        {t('退款扣回估算')}
                       </th>
                     </>
                   )}
@@ -1748,6 +1761,7 @@ export default function App() {
                     {showPulseEstimates && (
                       <PulseTransactionEstimate
                         transaction={tx}
+                        allocation={rewards.allocations.get(tx.id)}
                         today={today}
                         t={t}
                       />
@@ -1966,10 +1980,19 @@ export default function App() {
     </div>
   );
 }
-function PulseTransactionEstimate({ transaction, today, t }) {
+function PulseTransactionEstimate({ transaction, allocation, today, t }) {
   const estimate = isPulseTransaction(transaction)
     ? estimatePulseTransaction(transaction, { today })
     : null;
+  const refund = transaction.direction === 'credit';
+  const components =
+    allocation &&
+    transaction.currency === 'CNY' &&
+    t('基础 {base} · 年度 {annual} · 半年 {halfYear}', {
+      base: fromScaledBigInt(allocation.base),
+      annual: fromScaledBigInt(allocation.annual),
+      halfYear: fromScaledBigInt(allocation.halfYear),
+    });
   return (
     <>
       <td className="pulse-estimate-column">
@@ -1985,6 +2008,30 @@ function PulseTransactionEstimate({ transaction, today, t }) {
         )}
         {estimate && !estimate.included && (
           <small>{t(PULSE_REASONS[estimate.reason])}</small>
+        )}
+      </td>
+      <td className="pulse-estimate-column">
+        {allocation && !refund ? (
+          <>
+            <span className="amount">
+              {transaction.currency} {fromScaledBigInt(allocation.cashback)}
+            </span>
+            {components && <small>{components}</small>}
+          </>
+        ) : (
+          '—'
+        )}
+      </td>
+      <td className="pulse-estimate-column">
+        {allocation && refund ? (
+          <>
+            <span className="amount">
+              {transaction.currency} {fromScaledBigInt(-allocation.clawback)}
+            </span>
+            {components && <small>{components}</small>}
+          </>
+        ) : (
+          '—'
         )}
       </td>
     </>
