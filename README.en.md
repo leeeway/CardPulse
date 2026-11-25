@@ -67,6 +67,8 @@ Open the local address printed in your terminal, usually `http://localhost:5173`
 
 Filter by inclusive **posting-date ranges**, or reset all transaction filters. Date filters affect only the table and CSV export, without changing reward calculations. A reversed range shows an error and disables export. This feature is included starting with `v0.2.0-beta.3`.
 
+Bank views containing HSBC Pulse transactions show 25 rows per page (main branch). Selections carry across pages. CSV exports include every filtered row. Pulse rows show the applicable cashback rate and an estimate in the original currency before caps, with refunds shown as negative amounts. Estimates use the year-to-date Pulse rules. Open Pulse calculation details for period caps and aggregate refunds.
+
 ### Transaction review and statement management
 
 **Undo and restore (main branch).** Undo the most recent batch review from the transaction list while the workspace is still open. This restores every affected record to its state before the batch. A later edit or deletion of any affected record stops the entire undo. For one transaction, open its review history and choose Restore imported state to recover the category and channel before the first manual edit, including any unconfirmed channel. This option remains available after reopening a vault with saved history. Both actions recalculate rewards, append a history entry per changed row, and require saving to the encrypted vault.

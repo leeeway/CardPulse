@@ -785,6 +785,17 @@ th:last-child,
   white-space: nowrap;
   font-weight: 600;
 }
+.pulse-estimate-summary,
+.transaction-pagination {
+  margin: 10px 0;
+}
+.pulse-estimate-column {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+th.pulse-estimate-column {
+  white-space: nowrap;
+}
 .text-credit {
   color: var(--success);
 }
@@ -1295,7 +1306,8 @@ footer a {
 .explanation-table td {
   overflow-wrap: anywhere;
 }
-.explanation-pagination {
+.explanation-pagination,
+.transaction-pagination {
   display: flex;
   align-items: center;
   justify-content: space-between;

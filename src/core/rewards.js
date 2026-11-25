@@ -9,6 +9,8 @@ export const SCALE = 100000n;
 export const ANNUAL_CAP = 100000n * SCALE;
 export const PULSE_HALF_YEAR_CAP = 80000n * SCALE;
 const FX_SCALE = 10000000000n;
+const BASE_PER_MILLE = 4n;
+const BONUS_PER_MILLE = 20n;
 
 const nonnegative = (val) => (val > 0n ? val : 0n);
 const minBigInt = (a, b) => (a < b ? a : b);
@@ -39,8 +41,8 @@ export function getHongKongDate(date = new Date()) {
  */
 function computePool(gross, refunds, cap) {
   const used = minBigInt(gross, cap);
-  const beforeRefund = (used * 2n) / 100n; // 2% 额外返现
-  const clawback = minBigInt(beforeRefund, (refunds * 2n) / 100n);
+  const beforeRefund = (used * BONUS_PER_MILLE) / 1000n;
+  const clawback = minBigInt(beforeRefund, (refunds * BONUS_PER_MILLE) / 1000n);
   return {
     gross,
     cap,
@@ -110,8 +112,8 @@ export function calculateRewards(
   }
 
   // 基础返现：0.4%
-  const cnyBase = (nonnegative(cnyGross - cnyRefunds) * 4n) / 1000n;
-  const hkdBase = (nonnegative(hkdGross - hkdRefunds) * 4n) / 1000n;
+  const cnyBase = (nonnegative(cnyGross - cnyRefunds) * BASE_PER_MILLE) / 1000n;
+  const hkdBase = (nonnegative(hkdGross - hkdRefunds) * BASE_PER_MILLE) / 1000n;
 
   const validRate =
     typeof hkdCnyRate === 'number' &&
@@ -146,7 +148,7 @@ export function calculateRewards(
   );
   const pulseClawback = minBigInt(
     pulseBeforeRefund,
-    (pulseRefunds * 2n) / 100n,
+    (pulseRefunds * BONUS_PER_MILLE) / 1000n,
   );
   const pulse = {
     ...periods[halfIdx],
@@ -199,6 +201,10 @@ export const PULSE_REASONS = {
   hkdSpend: '仅计入港币基础返现',
   hkdRefund: '仅扣回港币基础返现',
 };
+export function isPulseTransaction({ bankId, ruleId }) {
+  return (!bankId || bankId === 'hsbc') && (!ruleId || ruleId === 'hsbc_pulse');
+}
+
 function matchPulseTransaction(tx, today, overrides) {
   const year = today.slice(0, 4);
   let reason,
@@ -206,10 +212,7 @@ function matchPulseTransaction(tx, today, overrides) {
   if (!tx.day || tx.day < `${year}-01-01` || tx.day > today)
     reason = 'outsideYear';
   else if (['repayment', 'fee'].includes(tx.category)) reason = 'category';
-  else if (
-    (tx.bankId && tx.bankId !== 'hsbc') ||
-    (tx.ruleId && tx.ruleId !== 'hsbc_pulse')
-  ) {
+  else if (!isPulseTransaction(tx)) {
     reason = 'unsupportedCard';
     pending = true;
   } else if (!['CNY', 'HKD'].includes(tx.currency)) {
@@ -260,6 +263,38 @@ function matchPulseTransaction(tx, today, overrides) {
     refundBaseOnly,
   };
 }
+
+/** Estimate a transaction in its original currency before allocating caps or netting refunds. */
+export function estimatePulseTransaction(
+  transaction,
+  { today = getHongKongDate(), overrides = {} } = {},
+) {
+  const match = matchPulseTransaction(transaction, today, overrides);
+  const {
+    reason,
+    included,
+    amount,
+    isCredit,
+    isPulseEligible,
+    refundBaseOnly,
+  } = match;
+  if (!included) return { included, reason };
+
+  const bonuses =
+    transaction.currency === 'CNY' && !(isCredit && refundBaseOnly)
+      ? isPulseEligible
+        ? 2n
+        : 1n
+      : 0n;
+  const perMille = BASE_PER_MILLE + bonuses * BONUS_PER_MILLE;
+  const cashback = (amount * perMille) / 1000n;
+  return {
+    included,
+    ratePercent: Number(perMille) / 10,
+    cashback: isCredit ? -cashback : cashback,
+  };
+}
+
 /** Trace eligibility without allocating aggregate caps to individual transactions. */
 export function explainPulseTransactions(
   transactions,

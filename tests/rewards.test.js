@@ -5,6 +5,7 @@ import {
   fromScaledBigInt,
   toScaledBigInt,
   explainPulseTransactions,
+  estimatePulseTransaction,
 } from '../src/core/rewards.js';
 
 describe('返现与额度精算引擎', () => {
@@ -102,6 +103,70 @@ describe('返现与额度精算引擎', () => {
 it('金额转换保留负数及小数符号', () => {
   assert.equal(toScaledBigInt('-0.12345'), -12345n);
   assert.equal(fromScaledBigInt(-12345n), '-0.12');
+});
+
+it('Pulse 逐笔用原币和适用比例估算封顶前金额，退款显示扣回', () => {
+  const pulse = {
+    id: 'purchase',
+    day: '2026-03-01',
+    amount: '120000.00',
+    currency: 'CNY',
+    category: 'spend',
+    direction: 'debit',
+    bankId: 'hsbc',
+    ruleId: 'hsbc_pulse',
+    channel: { key: 'applePay' },
+  };
+  const options = { today: '2026-04-10' };
+  const refund = {
+    id: 'refund',
+    direction: 'credit',
+    category: 'credit',
+    amount: '100.00',
+  };
+  for (const [patch, rate, expected] of [
+    [{}, 4.4, '5280.00'],
+    [
+      { amount: '100.00', channel: { key: 'standard', uncertain: true } },
+      2.4,
+      '2.40',
+    ],
+    [{ amount: '100.00', currency: 'HKD' }, 0.4, '0.40'],
+    [refund, 4.4, '-4.40'],
+    [{ ...refund, channel: { key: 'standard' } }, 2.4, '-2.40'],
+    [{ ...refund, currency: 'HKD' }, 0.4, '-0.40'],
+    [{ amount: '0.13', currency: 'HKD' }, 0.4, '0.00'],
+  ]) {
+    const estimate = estimatePulseTransaction({ ...pulse, ...patch }, options);
+    assert.equal(estimate.ratePercent, rate);
+    assert.equal(fromScaledBigInt(estimate.cashback), expected);
+  }
+  const baseOnly = estimatePulseTransaction(
+    { ...pulse, ...refund },
+    {
+      ...options,
+      overrides: { refund: { refundBaseOnly: true } },
+    },
+  );
+  assert.equal(baseOnly.ratePercent, 0.4);
+  assert.equal(fromScaledBigInt(baseOnly.cashback), '-0.40');
+  for (const [patch, reason] of [
+    [{ ruleId: 'hsbc_red' }, 'unsupportedCard'],
+    [{ category: 'fee' }, 'category'],
+    [{ ...refund, category: 'repayment' }, 'category'],
+    [{ channel: { key: 'exclude' } }, 'excluded'],
+    [{ day: '2026-04-11' }, 'outsideYear'],
+    [{ day: '2025-03-01' }, 'outsideYear'],
+  ]) {
+    assert.deepEqual(
+      estimatePulseTransaction({ ...pulse, ...patch }, options),
+      { included: false, reason },
+    );
+  }
+  assert.equal(
+    fromScaledBigInt(calculateRewards([pulse], options).totalCny),
+    '4080.00',
+  );
 });
 
 it('退款扣回奖赏但不释放额度，7月刷新专属消费额度', () => {

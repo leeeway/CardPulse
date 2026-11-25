@@ -15,8 +15,11 @@ import {
 import { DEMO_TRANSACTIONS } from './core/demo.js';
 import {
   calculateRewards,
+  estimatePulseTransaction,
   fromScaledBigInt,
   getHongKongDate,
+  isPulseTransaction,
+  PULSE_REASONS,
 } from './core/rewards.js';
 import { filterTransactions, exportToSafeCsv } from './core/transactions.js';
 import { fetchHkdCnyRate } from './core/exchange.js';
@@ -82,6 +85,7 @@ import {
 import { isIsoDate } from './core/campaigns.js';
 import { instantiateCampaignRules } from './core/campaign-rules.js';
 
+const TRANSACTION_PAGE_SIZE = 25;
 const emptyFilters = () => ({
   search: '',
   direction: 'all',
@@ -160,6 +164,7 @@ export default function App() {
   const [pdfPasswordRequest, setPdfPasswordRequest] = useState(null);
   const [importPreview, setImportPreview] = useState(null);
   const [filters, setFilters] = useState(emptyFilters);
+  const [page, setPage] = useState(0);
   const [reviewId, setReviewId] = useState(null);
   const [batchIds, setBatchIds] = useState(null);
   const [batchReviewOpen, setBatchReviewOpen] = useState(false);
@@ -248,11 +253,29 @@ export default function App() {
       ),
     [bankTransactions, filters, isDemo],
   );
-  // A changed scope must not leave any off-screen transaction selected.
+  const showPulseEstimates = useMemo(
+    () => bankTransactions.some(isPulseTransaction),
+    [bankTransactions],
+  );
+  const pageCount = showPulseEstimates
+    ? Math.max(1, Math.ceil(filteredList.length / TRANSACTION_PAGE_SIZE))
+    : 1;
+  const currentPage = Math.min(page, pageCount - 1);
+  const visibleTransactions = showPulseEstimates
+    ? filteredList.slice(
+        currentPage * TRANSACTION_PAGE_SIZE,
+        (currentPage + 1) * TRANSACTION_PAGE_SIZE,
+      )
+    : filteredList;
+  // Changes to the bank or filters reset the list and its selection together.
   useEffect(() => {
+    setPage(0);
     setBatchIds(null);
     setBatchReviewOpen(false);
   }, [activeBank, filters, isDemo, vaultLocked, workspaceSession]);
+  useEffect(() => {
+    setPage((previous) => Math.min(previous, pageCount - 1));
+  }, [pageCount]);
   const batchRows = useMemo(
     () =>
       batchIds?.size ? filteredList.filter((tx) => batchIds.has(tx.id)) : [],
@@ -1615,6 +1638,14 @@ export default function App() {
             )}
           </div>
         )}
+        {showPulseEstimates && filteredList.length > 0 && (
+          <p className="muted small pulse-estimate-summary">
+            {t(
+              'Pulse 逐笔返现按本年度截至 {date} 的交易估算，金额以原币显示。渠道待确认时按识别结果估算。',
+              { date: today },
+            )}
+          </p>
+        )}
         {filteredList.length ? (
           <div className="table-container">
             <table>
@@ -1628,14 +1659,24 @@ export default function App() {
                     '渠道',
                     '币种',
                     '金额',
-                    '操作',
                   ].map((label) => (
                     <th key={label}>{t(label)}</th>
                   ))}
+                  {showPulseEstimates && (
+                    <>
+                      <th scope="col" className="pulse-estimate-column">
+                        {t('适用返现比例')}
+                      </th>
+                      <th scope="col" className="pulse-estimate-column">
+                        {t('封顶前返现估算')}
+                      </th>
+                    </>
+                  )}
+                  <th scope="col">{t('操作')}</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredList.map((tx) => (
+                {visibleTransactions.map((tx) => (
                   <tr key={tx.id}>
                     {batchIds && (
                       <td>
@@ -1704,6 +1745,13 @@ export default function App() {
                       {tx.direction === 'credit' ? '−' : '+'}
                       {tx.amount}
                     </td>
+                    {showPulseEstimates && (
+                      <PulseTransactionEstimate
+                        transaction={tx}
+                        today={today}
+                        t={t}
+                      />
+                    )}
                     <td>
                       <button
                         type="button"
@@ -1733,6 +1781,32 @@ export default function App() {
               <p>{t('导入 PDF 或标准 CSV，也可以先查看示例数据。')}</p>
             )}
           </div>
+        )}
+        {pageCount > 1 && (
+          <nav className="transaction-pagination" aria-label={t('交易分页')}>
+            <button
+              type="button"
+              className="btn btn-ghost"
+              disabled={currentPage === 0}
+              onClick={() => setPage(currentPage - 1)}
+            >
+              {t('上一页')}
+            </button>
+            <span aria-live="polite">
+              {t('第 {page} / {pages} 页', {
+                page: currentPage + 1,
+                pages: pageCount,
+              })}
+            </span>
+            <button
+              type="button"
+              className="btn btn-ghost"
+              disabled={currentPage === pageCount - 1}
+              onClick={() => setPage(currentPage + 1)}
+            >
+              {t('下一页')}
+            </button>
+          </nav>
         )}
       </section>
       <BuildInfo t={t} />
@@ -1890,6 +1964,30 @@ export default function App() {
         />
       )}
     </div>
+  );
+}
+function PulseTransactionEstimate({ transaction, today, t }) {
+  const estimate = isPulseTransaction(transaction)
+    ? estimatePulseTransaction(transaction, { today })
+    : null;
+  return (
+    <>
+      <td className="pulse-estimate-column">
+        {estimate?.included ? `${estimate.ratePercent.toFixed(1)}%` : '—'}
+      </td>
+      <td className="pulse-estimate-column">
+        {estimate?.included ? (
+          <span className="amount">
+            {transaction.currency} {fromScaledBigInt(estimate.cashback)}
+          </span>
+        ) : (
+          '—'
+        )}
+        {estimate && !estimate.included && (
+          <small>{t(PULSE_REASONS[estimate.reason])}</small>
+        )}
+      </td>
+    </>
   );
 }
 function RewardCard({ title, badge, value, description, progress, primary }) {
