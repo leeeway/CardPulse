@@ -72,13 +72,15 @@ export function findPotentialDuplicates(transactions, statements) {
   };
 }
 
-/** Report overlaps involving at least one statement from the pending import. */
-export function findImportDuplicates(workspace, pendingIds) {
+/** Report overlaps involving at least one transaction staged for import. */
+export function findImportDuplicates(workspace, pendingTransactionIds) {
   const { groups } = findPotentialDuplicates(
     workspace.transactions,
     workspace.statements,
   );
   return groups.filter(({ entries }) =>
-    entries.some(({ statement }) => pendingIds.has(statement.id)),
+    entries.some(({ transaction }) =>
+      pendingTransactionIds.has(transaction.id),
+    ),
   );
 }

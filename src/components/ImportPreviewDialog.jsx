@@ -41,7 +41,16 @@ function PreviewPagination({ page, pages, setPage, groups = false, t }) {
   );
 }
 
-function DuplicateGroup({ group, pendingIds, skipped, onToggle, bankName, t }) {
+function DuplicateGroup({
+  group,
+  pendingTransactionIds,
+  skipped,
+  onToggle,
+  bankName,
+  pendingLabel,
+  skippedLabel,
+  t,
+}) {
   const [page, setPage] = useState(0);
   const first = group.entries[0].transaction;
   const start = page * RECORD_PAGE_SIZE;
@@ -59,13 +68,15 @@ function DuplicateGroup({ group, pendingIds, skipped, onToggle, bankName, t }) {
         {group.entries
           .slice(start, start + RECORD_PAGE_SIZE)
           .map(({ transaction, statement, statementNumber }) => {
-            const pending = pendingIds.has(statement.id);
+            const pending = pendingTransactionIds.has(transaction.id);
             const checked = !skipped.has(transaction.id);
             const location = sourceLocation(transaction, t);
             const details = (
               <span>
-                {t(pending ? (checked ? '待导入' : '已跳过') : '已入账')} ·{' '}
-                {t('结单 {number}', { number: statementNumber })} ·{' '}
+                {t(
+                  pending ? (checked ? pendingLabel : skippedLabel) : '已入账',
+                )}{' '}
+                · {t('结单 {number}', { number: statementNumber })} ·{' '}
                 {statement.fileName || t('未知结单')}
                 <span className="import-preview-entry-date muted small">
                   {t('交易日期')}：{transaction.transactionDay || t('未记录')}
@@ -111,6 +122,7 @@ function TransactionDetails({
   duplicateIds,
   skipped,
   onToggle,
+  skippedLabel,
   hidden,
   t,
 }) {
@@ -228,7 +240,9 @@ function TransactionDetails({
                     {duplicateIds.has(tx.id) && (
                       <span className="badge-tag">{t('疑似重复交易')}</span>
                     )}
-                    {!keep && <span className="badge-tag">{t('已跳过')}</span>}
+                    {!keep && (
+                      <span className="badge-tag">{t(skippedLabel)}</span>
+                    )}
                   </div>
                 </li>
               );
@@ -254,9 +268,25 @@ export default function ImportPreviewDialog({
 }) {
   const ref = useRef(null);
   const [page, setPage] = useState(0);
-  const [skipped, setSkipped] = useState(() => new Map());
+  const {
+    files,
+    pendingTransactionIds,
+    transactions,
+    duplicates,
+    supplementId,
+  } = preview;
+  const pendingLabel = supplementId ? '待补录' : '待导入';
+  const skippedLabel = supplementId ? '未勾选' : '已跳过';
+  const [skipped, setSkipped] = useState(
+    () =>
+      new Map(
+        supplementId
+          ? transactions.map(({ id, statementId }) => [id, statementId])
+          : [],
+      ),
+  );
   const [view, setView] = useState(
-    preview.duplicates.length ? 'duplicates' : 'details',
+    !supplementId && duplicates.length ? 'duplicates' : 'details',
   );
   useEffect(() => {
     const dialog = ref.current;
@@ -264,25 +294,23 @@ export default function ImportPreviewDialog({
     return () => dialog.close();
   }, []);
 
-  const { files, pendingIds, transactions, duplicates } = preview;
   const duplicateIds = useMemo(() => {
     const ids = new Set();
     for (const { entries } of duplicates) {
-      for (const { transaction, statement } of entries) {
-        if (pendingIds.has(statement.id)) ids.add(transaction.id);
+      for (const { transaction } of entries) {
+        if (pendingTransactionIds.has(transaction.id)) ids.add(transaction.id);
       }
     }
     return ids;
-  }, [duplicates, pendingIds]);
+  }, [duplicates, pendingTransactionIds]);
   const pages = Math.ceil(duplicates.length / GROUP_PAGE_SIZE);
   const skippedCounts = new Map();
   for (const statementId of skipped.values())
     skippedCounts.set(statementId, (skippedCounts.get(statementId) || 0) + 1);
   const retainedCount = transactions.length - skipped.size;
   const retainedFiles = files.filter(
-    ({ statement }) =>
-      statement &&
-      statement.transactionCount > (skippedCounts.get(statement.id) || 0),
+    ({ statement, pendingCount }) =>
+      statement && pendingCount > (skippedCounts.get(statement.id) || 0),
   ).length;
   const toggleTransaction = ({ id, statementId }, keep) => {
     setSkipped((previous) => {
@@ -303,7 +331,9 @@ export default function ImportPreviewDialog({
       }}
     >
       <header className="modal-header">
-        <h2 id="statement-import-title">{t('账单导入预览')}</h2>
+        <h2 id="statement-import-title">
+          {t(supplementId ? '补录交易预览' : '账单导入预览')}
+        </h2>
         <button
           className="btn btn-ghost"
           type="button"
@@ -321,14 +351,23 @@ export default function ImportPreviewDialog({
           aria-label={t('文件来源')}
         >
           {files.map(
-            ({ fileName, statement, statementNumber, messages }, index) => {
+            (
+              {
+                fileName,
+                statement,
+                statementNumber,
+                pendingCount = 0,
+                messages,
+              },
+              index,
+            ) => {
               const skippedCount = skippedCounts.get(statement?.id) || 0;
-              const count = (statement?.transactionCount || 0) - skippedCount;
+              const count = pendingCount - skippedCount;
               return (
                 <li className="import-preview-item" key={index}>
                   <strong>{fileName}</strong>{' '}
                   <span className="badge-tag">
-                    {t(count > 0 ? '待导入' : '已跳过')}
+                    {t(count > 0 ? pendingLabel : skippedLabel)}
                   </span>
                   {statement && (
                     <>
@@ -338,7 +377,7 @@ export default function ImportPreviewDialog({
                         {t(cardName(statement.ruleId))} ·{' '}
                         {t('{count} 笔交易', { count })}
                         {skippedCount > 0 &&
-                          ` · ${t('已跳过 {count} 笔', { count: skippedCount })}`}
+                          ` · ${t(supplementId ? '未勾选 {count} 笔' : '已跳过 {count} 笔', { count: skippedCount })}`}
                       </p>
                       {statement.warnings?.map((warning, index) => (
                         <p className="muted small" key={index}>
@@ -357,6 +396,11 @@ export default function ImportPreviewDialog({
             },
           )}
         </ul>
+        {supplementId && (
+          <p className="muted small">
+            {t('以下是原结单中尚未入账的交易。请勾选需要补录的记录。')}
+          </p>
+        )}
         <div
           className="import-preview-views"
           role="group"
@@ -392,6 +436,7 @@ export default function ImportPreviewDialog({
           duplicateIds={duplicateIds}
           skipped={skipped}
           onToggle={toggleTransaction}
+          skippedLabel={skippedLabel}
           hidden={view !== 'details'}
           t={t}
         />
@@ -410,7 +455,9 @@ export default function ImportPreviewDialog({
               </p>
               <p className="muted small">
                 {t(
-                  '请核对原始结单。疑似重复交易默认保留，取消勾选即可跳过该笔。',
+                  supplementId
+                    ? '请对照已入账记录，再勾选需要补录的交易。'
+                    : '请核对原始结单。疑似重复交易默认保留，取消勾选即可跳过该笔。',
                 )}
               </p>
               {duplicates
@@ -419,10 +466,12 @@ export default function ImportPreviewDialog({
                   <DuplicateGroup
                     key={group.key}
                     group={group}
-                    pendingIds={pendingIds}
+                    pendingTransactionIds={pendingTransactionIds}
                     skipped={skipped}
                     onToggle={toggleTransaction}
                     bankName={bankName}
+                    pendingLabel={pendingLabel}
+                    skippedLabel={skippedLabel}
                     t={t}
                   />
                 ))}
@@ -443,10 +492,15 @@ export default function ImportPreviewDialog({
           aria-live="polite"
           aria-atomic="true"
         >
-          {t('待导入 {files} 份文件，共 {count} 笔交易。', {
-            files: retainedFiles,
-            count: retainedCount,
-          })}
+          {t(
+            supplementId
+              ? '待补录 {count} 笔交易。'
+              : '待导入 {files} 份文件，共 {count} 笔交易。',
+            {
+              files: retainedFiles,
+              count: retainedCount,
+            },
+          )}
         </p>
         <button
           className="btn btn-secondary"
@@ -462,7 +516,7 @@ export default function ImportPreviewDialog({
           disabled={retainedCount === 0}
           onClick={() => onConfirm(new Set(skipped.keys()))}
         >
-          {t('确认导入')}
+          {t(supplementId ? '确认补录' : '确认导入')}
         </button>
       </footer>
     </dialog>

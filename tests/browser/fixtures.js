@@ -1,5 +1,5 @@
 // Synthetic statement with no real cardholder or transaction data.
-export function makeStatementPdf(amount = '50.00') {
+export function makeStatementPdf(amount = '50.00', extraAmount = '') {
   const texts = [
     [10, 780, 'STATEMENT DATE 10 JAN 2026 CNY'],
     [10, 770, '6222 XXXX XXXX 1234'],
@@ -9,8 +9,21 @@ export function makeStatementPdf(amount = '50.00') {
     [170, 720, '02 JAN'],
     [230, 720, 'TEST SHOP'],
     [850, 720, amount],
-    [230, 700, `CLOSING BALANCE ${(100 + Number(amount)).toFixed(2)}`],
+    [
+      230,
+      700,
+      `CLOSING BALANCE ${(100 + Number(amount) + Number(extraAmount)).toFixed(2)}`,
+    ],
   ];
+  if (extraAmount)
+    texts.splice(
+      -1,
+      0,
+      [10, 710, '03 JAN'],
+      [170, 710, '03 JAN'],
+      [230, 710, 'SECOND TEST SHOP'],
+      [850, 710, extraAmount],
+    );
   const stream = texts
     .map(([x, y, text]) => `BT /F1 10 Tf ${x} ${y} Td (${text}) Tj ET`)
     .join('\n');

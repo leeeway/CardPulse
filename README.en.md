@@ -114,6 +114,8 @@ A matched balance confirms arithmetic consistency. It does not confirm transacti
 
 Identical files are skipped even if renamed. Standard CSVs are checked separately for each bank and card. The preview flags possible overlaps among pending files and with transactions already imported. Check the original statements to decide which pending entries to skip. Partially imported statements keep their file fingerprint and show the number skipped. Reconciliation still uses all transactions parsed from the original file. You can select a fully skipped file again. Older records without file fingerprints or statement links require manual review.
 
+For a partially imported statement, open the statement and reconciliation list and choose **Import skipped transactions** (available on the main branch). Select the original PDF or standard CSV. A renamed copy works if its contents match. Only missing records appear in the transaction details, and all start unchecked. Review possible overlaps and select the rows to add. Existing transactions and review history are preserved. Save to the encrypted vault to keep the additions. If the new parse cannot be matched to the saved records, the import stops.
+
 Parser compatibility has been checked with synthetic data. More redacted real statement samples are needed to cover layout variations. Review extracted results when using an unsupported format.
 
 ## Banks, appearance, and custom campaigns

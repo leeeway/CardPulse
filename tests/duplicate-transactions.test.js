@@ -81,7 +81,10 @@ it('导入预览仅报告涉及待导入来源的组，包括本批文件之间�
     ],
   };
   const original = structuredClone(workspace);
-  const groups = findImportDuplicates(workspace, new Set(['s3', 's4']));
+  const groups = findImportDuplicates(
+    workspace,
+    new Set(['s3:0', 's3:1', 's4:0']),
+  );
   assert.deepEqual(
     groups.map(({ entries }) =>
       entries.map(({ statementNumber }) => statementNumber),
@@ -90,6 +93,12 @@ it('导入预览仅报告涉及待导入来源的组，包括本批文件之间�
       [1, 3],
       [3, 4],
     ],
+  );
+  assert.deepEqual(
+    findImportDuplicates(workspace, new Set(['s3:1'])).map(({ entries }) =>
+      entries.map(({ statementNumber }) => statementNumber),
+    ),
+    [[3, 4]],
   );
   assert.deepEqual(workspace, original);
 });

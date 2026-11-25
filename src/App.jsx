@@ -23,6 +23,7 @@ import { fetchHkdCnyRate } from './core/exchange.js';
 import {
   fingerprintFile,
   mergeStatement,
+  stageStatementSupplement,
   applyStatementImportSelection,
   belongsToStatement,
   removeStatement,
@@ -176,6 +177,8 @@ export default function App() {
   const [loadingFile, setLoadingFile] = useState(false);
   const busyRef = useRef(false);
   const fileInputRef = useRef(null);
+  const supplementInputRef = useRef(null);
+  const supplementTargetRef = useRef(null);
   const transactionsHeadingRef = useRef(null);
   const backupInputRef = useRef(null);
   const pdfPasswordResolver = useRef(null);
@@ -305,6 +308,7 @@ export default function App() {
     }
   };
   const clearMemory = () => {
+    supplementTargetRef.current = null;
     backupReminder.dismissPending();
     setWorkspaceSession((value) => value + 1);
     setReviewId(null);
@@ -372,15 +376,18 @@ export default function App() {
       return true;
     },
   });
-  const handleFiles = async (files) => {
+  const handleFiles = async (files, supplementId) => {
     if (!files?.length || unavailable || busyRef.current) return;
-    const selectedBank = importBank,
-      selectedCard = importCard;
+    const supplement =
+      supplementId && statements.find(({ id }) => id === supplementId);
+    if (supplementId && !supplement?.skippedTransactionCount) return;
+    const selectedBank = supplement?.bankId ?? importBank;
+    const selectedCard = supplement?.ruleId ?? importCard;
     const inputFiles = Array.from(files);
     busyRef.current = true;
     setLoadingFile(true);
     const results = [];
-    const pendingIds = new Set();
+    const pendingStatementIds = new Set();
     const existingIds = new Set(workspace.statements.map(({ id }) => id));
     let next = workspace;
     try {
@@ -399,17 +406,20 @@ export default function App() {
             bankId: selectedBank,
             cardId: selectedCard,
           });
-          if (existingIds.has(fingerprint)) {
+          if (supplement && fingerprint !== supplement.id)
+            throw new Error('文件内容与所选结单不符，请选择原文件。');
+          if (!supplement && existingIds.has(fingerprint)) {
             entry.messages.push('已导入，跳过重复文件');
             continue;
           }
-          if (pendingIds.has(fingerprint)) {
+          if (pendingStatementIds.has(fingerprint)) {
             entry.messages.push('与本批文件内容相同，已跳过');
             continue;
           }
           let result;
+          const sourceName = supplement?.fileName ?? file.name;
           if (isCsv)
-            result = parseStandardCsv(await file.text(), file.name, {
+            result = parseStandardCsv(await file.text(), sourceName, {
               bankId: selectedBank,
               cardId: selectedCard,
             });
@@ -421,6 +431,7 @@ export default function App() {
                 result = await parsePdfStatement(file, {
                   password,
                   cardId: selectedCard,
+                  fileName: sourceName,
                 });
               } catch (error) {
                 if (error.code !== 'password') throw error;
@@ -439,26 +450,41 @@ export default function App() {
             entry.messages.push('已取消');
             continue;
           }
-          if (!result.transactions.length) {
+          if (!result.transactions.length && !supplement) {
             entry.messages = result.warnings;
             continue;
           }
-          next = normalizeWorkspace(mergeStatement(next, result, fingerprint));
-          pendingIds.add(fingerprint);
-          entry.statement = next.statements.at(-1);
-          entry.statementNumber = next.statements.length;
+          const previousCount = next.transactions.length;
+          next = normalizeWorkspace(
+            supplement
+              ? stageStatementSupplement(next, result, fingerprint)
+              : mergeStatement(next, result, fingerprint),
+          );
+          pendingStatementIds.add(fingerprint);
+          entry.statementNumber = supplement
+            ? statementNumbers.get(fingerprint)
+            : next.statements.length;
+          entry.statement = next.statements[entry.statementNumber - 1];
+          entry.pendingCount = next.transactions.length - previousCount;
         } catch (error) {
           entry.messages.push(error.message);
         }
       }
-      if (pendingIds.size) {
+      if (pendingStatementIds.size) {
+        const pendingTransactions = next.transactions.slice(
+          workspace.transactions.length,
+        );
+        const pendingTransactionIds = new Set(
+          pendingTransactions.map(({ id }) => id),
+        );
         setImportPreview({
           base: workspace,
           next,
           files: results,
-          pendingIds,
-          transactions: next.transactions.slice(workspace.transactions.length),
-          duplicates: findImportDuplicates(next, pendingIds),
+          supplementId,
+          pendingTransactionIds,
+          transactions: pendingTransactions,
+          duplicates: findImportDuplicates(next, pendingTransactionIds),
         });
       } else {
         setNotice(
@@ -473,6 +499,14 @@ export default function App() {
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
+  const pickSupplementFile = (statement) => {
+    if (unavailable || busyRef.current) return;
+    const input = supplementInputRef.current;
+    if (!input) return;
+    supplementTargetRef.current = statement.id;
+    input.accept = statement.id.startsWith('csv:') ? '.csv' : '.pdf';
+    input.click();
+  };
   const confirmImport = (skippedIds) => {
     if (!importPreview || busyRef.current || vaultLocked) return;
     if (workspace !== importPreview.base) {
@@ -482,7 +516,7 @@ export default function App() {
     }
     const next = applyStatementImportSelection(
       importPreview.next,
-      importPreview.pendingIds,
+      importPreview.pendingTransactionIds,
       skippedIds,
     );
     if (next.transactions.length === workspace.transactions.length) return;
@@ -493,6 +527,20 @@ export default function App() {
     setWorkspace(next);
     setDirty(true);
     setIsDemo(false);
+    if (importPreview.supplementId) {
+      const statement = importedStatements.get(importPreview.supplementId);
+      setNotice([
+        {
+          file: statement.fileName,
+          text: '已补录 {count} 笔交易，剩余 {remaining} 笔待补录。',
+          values: {
+            count: next.transactions.length - workspace.transactions.length,
+            remaining: statement.skippedTransactionCount || 0,
+          },
+        },
+      ]);
+      return;
+    }
     setActiveBank('all');
     setNotice(
       importPreview.files.flatMap(({ fileName, statement, messages }) => {
@@ -549,6 +597,7 @@ export default function App() {
         setWorkspaceSession((value) => value + 1);
         setReviewId(null);
         setLastBatchReview(null);
+        supplementTargetRef.current = null;
         setImportPreview(null);
         setWorkspace(data);
         setHasVault(true);
@@ -1272,6 +1321,20 @@ export default function App() {
             <FileText size={16} />
             {t('查看结单与对账')} · {bankStatements.length}
           </summary>
+          <input
+            type="file"
+            hidden
+            ref={supplementInputRef}
+            aria-label={t('选择原始结单文件')}
+            disabled={unavailable}
+            onChange={(event) => {
+              const statementId = supplementTargetRef.current;
+              supplementTargetRef.current = null;
+              const files = Array.from(event.target.files);
+              event.target.value = '';
+              if (statementId) handleFiles(files, statementId);
+            }}
+          />
           <div aria-label={t('结单与对账结果')}>
             {bankStatements.map((statement) => (
               <div key={statement.id} className="statement-row">
@@ -1314,6 +1377,16 @@ export default function App() {
                 >
                   {t('查看该结单交易')}
                 </button>
+                {statement.skippedTransactionCount > 0 && (
+                  <button
+                    type="button"
+                    className="btn btn-ghost"
+                    disabled={unavailable}
+                    onClick={() => pickSupplementFile(statement)}
+                  >
+                    {t('补录跳过的交易')}
+                  </button>
+                )}
                 <button
                   type="button"
                   className="btn btn-ghost"
