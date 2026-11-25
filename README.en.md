@@ -69,6 +69,8 @@ Filter by inclusive **posting-date ranges**, or reset all transaction filters. D
 
 Bank views containing HSBC Pulse transactions show 25 rows per page (main branch). Selections carry across pages. CSV exports include every filtered row. Pulse rows show the applicable cashback rate and before-cap estimate in the original currency. Purchases also show the capped estimate, and refunds show the allocated deduction as a negative amount.
 
+CSV exports from these views include the applicable cashback rate, before-cap and after-cap estimates, and the refund deduction. Estimated amounts are numeric and use the currency in each row’s currency column. Non-Pulse rows and inapplicable fields are blank.
+
 The annual and each half-year allowance are allocated independently in posting-date order, with workspace order breaking same-day ties. Refunds draw from earned year-to-date rewards in posting-date order, using the combined capped half-year bonus for that component. Spending allowances stay used after refunds. Allocations use all matched year-to-date records across pages and filters. Rounding to cents can cause display differences. Open Pulse calculation details for the summary.
 
 ### Transaction review and statement management

@@ -4,6 +4,8 @@ import {
   filterTransactions,
   exportToSafeCsv,
 } from '../src/core/transactions.js';
+import { calculateRewards } from '../src/core/rewards.js';
+import { translate } from '../src/core/i18n.js';
 
 describe('交易工具与安全 CSV 导出', () => {
   const sampleTxs = [
@@ -83,5 +85,78 @@ describe('交易工具与安全 CSV 导出', () => {
     assert.ok(csv.includes('"\'=cmd|""/C calc""!A0"'));
     assert.ok(csv.includes("'+100.00"));
     assert.ok(csv.includes("'@malicious"));
+  });
+
+  it('Pulse CSV 使用完整工作区分摊，保留原币数字、扣回负号与不适用空值', () => {
+    const pulse = {
+      ...sampleTxs[1],
+      id: 'spend',
+      day: '2026-07-02',
+      description: 'PULSE SPEND',
+      amount: '100.00',
+      bankId: 'hsbc',
+      ruleId: 'hsbc_pulse',
+      channel: { key: 'applePay' },
+    };
+    const refund = {
+      ...pulse,
+      id: 'refund',
+      description: 'HKD REFUND',
+      currency: 'HKD',
+      direction: 'credit',
+      category: 'credit',
+    };
+    const rows = [
+      pulse,
+      refund,
+      {
+        ...refund,
+        id: 'later-refund',
+        day: '2026-07-03',
+        description: 'LATER REFUND',
+      },
+      { ...pulse, id: 'fee', category: 'fee', description: 'FEE' },
+      {
+        ...pulse,
+        id: 'other',
+        bankId: 'bochk',
+        ruleId: 'bochk_custom',
+        description: 'OTHER',
+      },
+    ];
+    const { allocations } = calculateRewards(
+      [
+        ...rows,
+        { ...pulse, id: 'hidden-cap', day: '2026-01-01', amount: '100000.00' },
+        {
+          ...pulse,
+          id: 'hidden-hk',
+          day: '2026-01-01',
+          amount: '50.00',
+          currency: 'HKD',
+        },
+      ],
+      { today: '2026-10-19', hkdCnyRate: 0.93, allocateTransactions: true },
+    );
+    const [header, ...records] = exportToSafeCsv(
+      rows,
+      (key) => translate('zh-TW', key),
+      {
+        pulseAllocations: allocations,
+      },
+    ).split('\r\n');
+    assert.ok(
+      header.endsWith(
+        ',"適用回贈比例","設限前回贈估算","設限後回贈估算","退款扣回估算"',
+      ),
+    );
+    assert.ok(records[0].includes(',"CNY",'));
+    assert.ok(records[0].endsWith(',"4.4%","4.40","2.40",""'));
+    assert.ok(records[1].includes(',"HKD",'));
+    assert.ok(records[1].endsWith(',"0.4%","-0.40","","-0.20"'));
+    assert.ok(records[2].endsWith(',"0.4%","-0.40","","0.00"'));
+    assert.ok(records[3].endsWith(',"","","",""'));
+    assert.ok(records[4].endsWith(',"","","",""'));
+    assert.doesNotMatch(exportToSafeCsv(rows), /封顶后返现估算/);
   });
 });

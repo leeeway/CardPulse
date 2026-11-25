@@ -1044,7 +1044,9 @@ export default function App() {
               disabled={invalidDateRange}
               onClick={() =>
                 download(
-                  exportToSafeCsv(filteredList, t),
+                  exportToSafeCsv(filteredList, t, {
+                    pulseAllocations: rewards.allocations,
+                  }),
                   `CardPulse_${getHongKongDate()}.csv`,
                   'text/csv;charset=utf-8;',
                 )
@@ -1981,9 +1983,10 @@ export default function App() {
   );
 }
 function PulseTransactionEstimate({ transaction, allocation, today, t }) {
-  const estimate = isPulseTransaction(transaction)
-    ? estimatePulseTransaction(transaction, { today })
-    : null;
+  const excluded =
+    !allocation && isPulseTransaction(transaction)
+      ? estimatePulseTransaction(transaction, { today })
+      : null;
   const refund = transaction.direction === 'credit';
   const components =
     allocation &&
@@ -1996,19 +1999,18 @@ function PulseTransactionEstimate({ transaction, allocation, today, t }) {
   return (
     <>
       <td className="pulse-estimate-column">
-        {estimate?.included ? `${estimate.ratePercent.toFixed(1)}%` : '—'}
+        {allocation ? `${allocation.ratePercent.toFixed(1)}%` : '—'}
       </td>
       <td className="pulse-estimate-column">
-        {estimate?.included ? (
+        {allocation ? (
           <span className="amount">
-            {transaction.currency} {fromScaledBigInt(estimate.cashback)}
+            {transaction.currency}{' '}
+            {fromScaledBigInt(allocation.beforeCapCashback)}
           </span>
         ) : (
           '—'
         )}
-        {estimate && !estimate.included && (
-          <small>{t(PULSE_REASONS[estimate.reason])}</small>
-        )}
+        {excluded?.reason && <small>{t(PULSE_REASONS[excluded.reason])}</small>}
       </td>
       <td className="pulse-estimate-column">
         {allocation && !refund ? (

@@ -264,13 +264,9 @@ function allocatePulseTransactions(matchedTransactions, result) {
     left.transaction.day.localeCompare(right.transaction.day),
   );
   const allocations = new Map();
-  for (const {
-    transaction,
-    amount,
-    isCredit,
-    isPulseEligible,
-    refundBaseOnly,
-  } of matchedTransactions) {
+  for (const match of matchedTransactions) {
+    const { transaction, amount, isCredit, isPulseEligible, refundBaseOnly } =
+      match;
     const { id, currency, day } = transaction;
     const base = (isCredit ? baseRefunds : baseSpends)[currency](amount);
     const eligibleForBonus =
@@ -283,10 +279,16 @@ function allocatePulseTransactions(matchedTransactions, result) {
         ? (isCredit ? halfYearRefund : halfYearSpends[halfOfYear(day)])(amount)
         : 0n;
     const total = base + annual + halfYear;
+    const { ratePercent, cashback: beforeCapCashback } = estimateBeforeCap(
+      currency,
+      match,
+    );
     allocations.set(id, {
       base,
       annual,
       halfYear,
+      ratePercent,
+      beforeCapCashback,
       cashback: isCredit ? 0n : total,
       clawback: isCredit ? total : 0n,
     });
@@ -371,24 +373,12 @@ function matchPulseTransaction(tx, today, overrides) {
   };
 }
 
-/** Estimate a transaction in its original currency before allocating caps or netting refunds. */
-export function estimatePulseTransaction(
-  transaction,
-  { today = getHongKongDate(), overrides = {} } = {},
+function estimateBeforeCap(
+  currency,
+  { amount, isCredit, isPulseEligible, refundBaseOnly },
 ) {
-  const match = matchPulseTransaction(transaction, today, overrides);
-  const {
-    reason,
-    included,
-    amount,
-    isCredit,
-    isPulseEligible,
-    refundBaseOnly,
-  } = match;
-  if (!included) return { included, reason };
-
   const bonuses =
-    transaction.currency === 'CNY' && !(isCredit && refundBaseOnly)
+    currency === 'CNY' && !(isCredit && refundBaseOnly)
       ? isPulseEligible
         ? 2n
         : 1n
@@ -396,10 +386,20 @@ export function estimatePulseTransaction(
   const perMille = BASE_PER_MILLE + bonuses * BONUS_PER_MILLE;
   const cashback = rewardAtRate(amount, perMille);
   return {
-    included,
     ratePercent: Number(perMille) / 10,
     cashback: isCredit ? -cashback : cashback,
   };
+}
+
+/** Estimate a transaction in its original currency before allocating caps or netting refunds. */
+export function estimatePulseTransaction(
+  transaction,
+  { today = getHongKongDate(), overrides = {} } = {},
+) {
+  const match = matchPulseTransaction(transaction, today, overrides);
+  return match.included
+    ? { included: true, ...estimateBeforeCap(transaction.currency, match) }
+    : { included: false, reason: match.reason };
 }
 
 /** Trace eligibility without allocating aggregate caps to individual transactions. */

@@ -111,6 +111,19 @@ test('Pulse explanations reconcile annual and half-year pools and show missing F
   ).toContainText('3526.12');
   await expect(breakdown).toContainText('CNY 3.72');
   await expect(estimate('HKD SHOP').nth(2)).toHaveText('HKD 4.00');
+  const exportReady = page.waitForEvent('download');
+  await page.getByRole('button', { name: '导出 CSV', exact: true }).click();
+  const [headerLine, ...exportedRows] = (
+    await readFile(await (await exportReady).path(), 'utf8')
+  ).split('\r\n');
+  const exported = (merchant) =>
+    exportedRows.find((line) => line.includes(`"${merchant}"`));
+  expect(headerLine).toMatch(
+    /,"适用返现比例","封顶前返现估算","封顶后返现估算","退款扣回估算"$/,
+  );
+  expect(exported('REFUND')).toMatch(/,"4\.4%","-440\.00","","-440\.00"$/);
+  expect(exported('HKD SHOP')).toMatch(/,"HKD",.*,"0\.4%","4\.00","4\.00",""$/);
+  expect(exported('OTHER BANK')).toMatch(/,"","","",""$/);
   await page.getByLabel('搜索商户、卡号或备注').fill('STANDARD SHOP');
   await page
     .locator('.transactions-section tbody tr')
@@ -208,8 +221,11 @@ test('Pulse ledger pages filtered rows, preserves selections and exports across 
   const downloaded = page.waitForEvent('download');
   await page.getByRole('button', { name: '导出 CSV', exact: true }).click();
   const content = await readFile(await (await downloaded).path(), 'utf8');
-  expect(content.split('\r\n')).toHaveLength(28);
-  expect(content).toContain('REPORT 01');
-  expect(content).toContain('REPORT 27');
+  const [, ...records] = content.split('\r\n');
+  expect(records).toHaveLength(27);
+  for (const merchant of ['REPORT 01', 'REPORT 27']) {
+    const row = records.find((line) => line.includes(`"${merchant}"`));
+    expect(row).toMatch(/,"4\.4%","4\.40","2\.40",""$/);
+  }
   expect(content).not.toContain('SKIP THIS');
 });

@@ -2,6 +2,7 @@ import { escapeCsvCell } from './safe-csv.js';
 import { bankOf } from './banks.js';
 import { channelText } from './i18n.js';
 import { belongsToStatement } from './imports.js';
+import { fromScaledBigInt } from './rewards.js';
 
 /**
  * 交易列表过滤、统计与安全 CSV 导出工具
@@ -40,7 +41,11 @@ export function filterTransactions(transactions, filters) {
 /**
  * 安全导出 CSV，对 = + - @ 符号进行转义防止 Excel 公式执行漏洞 (Formula Injection)
  */
-export function exportToSafeCsv(transactions, translate = (text) => text) {
+export function exportToSafeCsv(
+  transactions,
+  translate = (text) => text,
+  { pulseAllocations } = {},
+) {
   const headers = [
     '交易日期',
     '记账日期',
@@ -56,6 +61,13 @@ export function exportToSafeCsv(transactions, translate = (text) => text) {
     '渠道与备注',
     '结单文件名',
   ];
+  if (pulseAllocations)
+    headers.push(
+      '适用返现比例',
+      '封顶前返现估算',
+      '封顶后返现估算',
+      '退款扣回估算',
+    );
 
   const escapeCell = escapeCsvCell;
 
@@ -77,6 +89,7 @@ export function exportToSafeCsv(transactions, translate = (text) => text) {
     ),
     escapeCell(tx.notes?.join('; ') || ''),
     escapeCell(tx.sources?.map((s) => s.fileName).join(';') || ''),
+    ...(pulseAllocations ? pulseCsvCells(tx, pulseAllocations.get(tx.id)) : []),
   ]);
 
   const csvContent =
@@ -86,4 +99,16 @@ export function exportToSafeCsv(transactions, translate = (text) => text) {
       ...rows.map((r) => r.join(',')),
     ].join('\r\n');
   return csvContent;
+}
+
+// Generated fixed-point amounts can retain their minus sign as a numeric CSV value.
+function pulseCsvCells(transaction, allocation) {
+  if (!allocation) return ['""', '""', '""', '""'];
+  const refund = transaction.direction === 'credit';
+  return [
+    escapeCsvCell(`${allocation.ratePercent.toFixed(1)}%`),
+    `"${fromScaledBigInt(allocation.beforeCapCashback)}"`,
+    refund ? '""' : `"${fromScaledBigInt(allocation.cashback)}"`,
+    refund ? `"${fromScaledBigInt(-allocation.clawback)}"` : '""',
+  ];
 }
