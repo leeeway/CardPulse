@@ -97,6 +97,9 @@ try {
   await importPreview
     .getByText('待导入 1 份文件，共 1 笔交易。', { exact: true })
     .waitFor();
+  await importPreview
+    .getByRole('checkbox', { name: /native-statement\.pdf.*PDF 第 1 页/ })
+    .waitFor();
   assert.equal(await page.locator('tbody tr').count(), 0);
   await confirmStatementImport(page);
   await page.getByText('已导入 1 笔交易', { exact: false }).waitFor();

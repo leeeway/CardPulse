@@ -1028,6 +1028,44 @@ footer a {
 .import-preview-entry-date {
   display: block;
 }
+.import-preview-views,
+.import-preview-filters {
+  margin: 14px 0;
+}
+.import-preview-views {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.import-preview-filters .field {
+  flex: 1 1 175px;
+  min-width: 0;
+  margin: 0;
+}
+.import-detail-record {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px 12px;
+}
+.import-detail-record .import-preview-choice {
+  margin-bottom: 6px;
+}
+.import-detail-values {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+@media (max-width: 480px) {
+  .import-detail-record {
+    grid-template-columns: 1fr;
+  }
+  .import-detail-values {
+    flex-direction: row;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+}
 .import-preview-footer {
   align-items: center;
   padding-top: 12px;

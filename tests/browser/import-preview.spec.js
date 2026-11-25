@@ -233,6 +233,77 @@ test('individual selections persist across duplicate group and record pages', as
   await expect(rows(page).filter({ hasText: 'Overlap 1' })).toHaveCount(10);
 });
 
+test('all staged rows can be inspected, filtered and skipped with selections shared across views', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await expect(upload(page)).toBeEnabled();
+  const overlap = row('Previous purchase');
+  await upload(page).setInputFiles(csv('old.csv', [overlap]));
+  await confirmStatementImport(page);
+
+  await upload(page).setInputFiles([
+    csv('incoming.csv', [
+      overlap,
+      row('Wrong amount', 77),
+      ...Array.from({ length: 10 }, (_, index) => row(`Shop ${index + 1}`)),
+    ]),
+    csv('incoming.csv', [row('Another purchase', 77)]),
+  ]);
+  const preview = statementImportPreview(page);
+  const duplicates = preview.getByRole('region', { name: '疑似重复交易' });
+  const duplicate = duplicates.getByRole('checkbox', {
+    name: /结单 2.*CSV 第 2 行/,
+  });
+  await duplicate.uncheck();
+  await button(preview, '交易明细').click();
+  const details = preview.getByRole('region', { name: '交易明细' });
+  const source = details.getByLabel('结单来源');
+  const search = details.getByRole('searchbox');
+  await expect(details).toContainText('符合筛选的 13 笔交易');
+  await expect(
+    details.getByRole('checkbox', { name: /Previous purchase/ }),
+  ).not.toBeChecked();
+  await expect(details.getByRole('checkbox')).toHaveCount(10);
+  await button(details, '下一页').click();
+  await expect(
+    details.getByRole('checkbox', { name: /Shop 10/ }),
+  ).toBeVisible();
+
+  await source.selectOption({ label: '结单 2 · incoming.csv' });
+  await expect(
+    details.getByRole('checkbox', { name: /Previous purchase/ }),
+  ).toBeVisible();
+  await search.fill('77.00');
+  await expect(details.getByRole('checkbox')).toHaveCount(1);
+  const anomaly = details
+    .getByRole('listitem')
+    .filter({ hasText: 'Wrong amount' });
+  await expect(anomaly).toContainText('CSV 第 3 行');
+  await expect(anomaly).toContainText('记账日期 2026-11-05');
+  await expect(anomaly).toContainText('HKD +77.00');
+  await anomaly.getByRole('checkbox').uncheck();
+  await search.fill('unknown merchant');
+  await expect(details).toContainText('未找到匹配的交易记录');
+  await expect(preview).toContainText('待导入 2 份文件，共 11 笔交易。');
+  await expect(rows(page)).toHaveCount(1);
+
+  await search.fill('previous purchase');
+  await details.getByRole('checkbox', { name: /Previous purchase/ }).check();
+  await button(preview, '疑似重复交易').click();
+  await expect(duplicate).toBeChecked();
+  await duplicate.uncheck();
+  await confirmStatementImport(page);
+  await expect(rows(page)).toHaveCount(12);
+  await expect(rows(page).filter({ hasText: 'Wrong amount' })).toHaveCount(0);
+  await expect(rows(page).filter({ hasText: 'Previous purchase' })).toHaveCount(
+    1,
+  );
+  await expect(rows(page).filter({ hasText: 'Another purchase' })).toHaveCount(
+    1,
+  );
+});
+
 test('drag and drop stages a file in Traditional Chinese and Escape discards it on mobile', async ({
   page,
 }) => {
@@ -251,6 +322,13 @@ test('drag and drop stages a file in Traditional Chinese and Escape discards it 
   const preview = statementImportPreview(page);
   await expect(preview).toContainText('待匯入 1 份檔案，共 1 筆交易。');
   await expect(preview).toContainText('未發現符合檢查條件的疑似重疊記錄。');
+  const details = preview.getByRole('region', { name: '交易明細' });
+  await expect(
+    details.getByRole('searchbox', { name: '搜尋交易' }),
+  ).toBeVisible();
+  await expect(
+    details.getByRole('checkbox', { name: /Mobile shop/ }),
+  ).toBeChecked();
   await expect(button(preview, '確認匯入')).toBeInViewport();
   await expect(rows(page)).toHaveCount(0);
   await page.keyboard.press('Escape');

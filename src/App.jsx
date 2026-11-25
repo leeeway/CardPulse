@@ -457,8 +457,7 @@ export default function App() {
           next,
           files: results,
           pendingIds,
-          transactionCount:
-            next.transactions.length - workspace.transactions.length,
+          transactions: next.transactions.slice(workspace.transactions.length),
           duplicates: findImportDuplicates(next, pendingIds),
         });
       } else {
