@@ -56,6 +56,7 @@ import {
   parseStandardCsv,
 } from './core/csv-import.js';
 import {
+  MAC_PULSE_PAGE_SIZES,
   readPreferences,
   savePreferences,
   THEMES,
@@ -91,7 +92,6 @@ import {
 import { isIsoDate } from './core/campaigns.js';
 import { instantiateCampaignRules } from './core/campaign-rules.js';
 
-const TRANSACTION_PAGE_SIZES = [25, 50, 100];
 const emptyFilters = () => ({
   search: '',
   direction: 'all',
@@ -123,6 +123,8 @@ export default function App() {
     },
   ] = useState(createVaultClient);
   const [preferences, setPreferences] = useState(() => readPreferences());
+  const isMac = globalThis.cardpulseDesktop?.platform === 'darwin';
+  const pageSize = isMac ? preferences.macPulsePageSize : MAC_PULSE_PAGE_SIZES[0];
   const t = (text, values) => translate(preferences.locale, text, values);
   const bankName = (bank) =>
     bank
@@ -171,7 +173,6 @@ export default function App() {
   const [importPreview, setImportPreview] = useState(null);
   const [filters, setFilters] = useState(emptyFilters);
   const [page, setPage] = useState(0);
-  const [pageSize, setPageSize] = useState(TRANSACTION_PAGE_SIZES[0]);
   const [reviewId, setReviewId] = useState(null);
   const [batchIds, setBatchIds] = useState(null);
   const [batchReviewOpen, setBatchReviewOpen] = useState(false);
@@ -944,7 +945,6 @@ export default function App() {
     }
   };
 
-  const isMac = globalThis.cardpulseDesktop?.platform === 'darwin';
   const compactPulseLedger = isMac && showPulseEstimates;
   const macPulsePageRange =
     compactPulseLedger && filteredList.length > 0
@@ -963,7 +963,7 @@ export default function App() {
   };
   const changeMacPulsePageSize = (nextSize) => {
     setPage(Math.floor(pageStart / nextSize));
-    setPageSize(nextSize);
+    setPreferences((previous) => ({ ...previous, macPulsePageSize: nextSize }));
     transactionsHeadingRef.current?.scrollIntoView({ block: 'start' });
   };
   const themeLabel = t(isMac ? '配色' : '网站配色');
@@ -2182,7 +2182,7 @@ function TransactionPagination({
               value={pageSize}
               onChange={(event) => onPageSizeChange(Number(event.target.value))}
             >
-              {TRANSACTION_PAGE_SIZES.map((size) => (
+              {MAC_PULSE_PAGE_SIZES.map((size) => (
                 <option key={size} value={size}>
                   {t('{count} 笔', { count: size })}
                 </option>

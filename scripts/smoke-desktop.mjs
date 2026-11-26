@@ -362,6 +362,58 @@ try {
   await page.getByRole('dialog').waitFor({ state: 'hidden' });
   assert.equal(await page.getByLabel('空闲锁定时限').inputValue(), '5');
   assert.equal(await page.locator('tbody tr').count(), 0);
+  if (process.platform === 'darwin') {
+    await page.clock.resume();
+    const transactions = Array.from({ length: 57 }, (_, index) => {
+      const currency = index < 53 ? 'CNY' : 'HKD';
+      return `2026-11-01,PULSE PAGE ${index + 1},100.00,${currency},debit`;
+    });
+    await page.locator('input[accept=".pdf,.csv"]').setInputFiles({
+      name: 'pulse-desktop-pagination.csv',
+      mimeType: 'text/csv',
+      buffer: Buffer.from(
+        ['day,description,amount,currency,direction', ...transactions].join('\n'),
+      ),
+    });
+    await confirmStatementImport(page);
+    await page.getByRole('button', { name: '保存到加密库', exact: true }).click();
+    await page.getByLabel('主密码', { exact: true }).fill(vaultPassword);
+    await page.getByRole('button', { name: '加密保存', exact: true }).click();
+    await page.getByRole('dialog').waitFor({ state: 'hidden' });
+
+    const bottomPager = () =>
+      page.getByRole('navigation', { name: '列表底部交易分页' });
+    await bottomPager().getByLabel('每页笔数').selectOption('50');
+    await bottomPager().getByRole('button', { name: '下一页' }).click();
+    await bottomPager()
+      .getByText('第 51–57 笔，共 57 笔', { exact: true })
+      .waitFor();
+    await application.close();
+    application = null;
+    application = await launch();
+    page = await application.firstWindow();
+    await page.getByRole('button', { name: '解锁本地库', exact: true }).click();
+    await page.getByLabel('主密码', { exact: true }).fill(vaultPassword);
+    await page.getByRole('button', { name: '解锁数据', exact: true }).click();
+    await bottomPager()
+      .getByText('第 1–50 笔，共 57 笔', { exact: true })
+      .waitFor();
+    assert.equal(await bottomPager().getByLabel('每页笔数').inputValue(), '50');
+    assert.equal(await bottomPager().getByLabel('跳到页码').inputValue(), '1');
+    await bottomPager().getByRole('button', { name: '下一页' }).click();
+    await bottomPager()
+      .getByText('第 51–57 笔，共 57 笔', { exact: true })
+      .waitFor();
+    await page.getByLabel('币种', { exact: true }).selectOption('CNY');
+    await bottomPager()
+      .getByText('第 1–50 笔，共 53 笔', { exact: true })
+      .waitFor();
+    assert.equal(await bottomPager().getByLabel('每页笔数').inputValue(), '50');
+    assert.equal(await bottomPager().getByLabel('跳到页码').inputValue(), '1');
+    console.log(
+      'PASS: Mac Pulse page size survives an app restart, and reopening or filtering starts at page one with the updated range.',
+    );
+  }
   console.log(
     'PASS: Electron secure origin, isolated renderer, packaged PDF worker, offline startup/import, encrypted PDF password retry and import preview, native encrypted file, manual FX persistence, backup/export/restore, native backup confirmation and cancellation, password changes and old backup compatibility, Pulse calculation explanations, transaction review history, statement deletion, reload, full application restart, idle lock/unlock, and campaign rule imports.',
   );

@@ -162,6 +162,9 @@ test('Pulse explanations reconcile annual and half-year pools and show missing F
 test('Pulse ledger pages filtered rows, preserves selections and exports across pages', async ({
   page,
 }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem('cardpulse.preferences', '{"macPulsePageSize":100}');
+  });
   await page.clock.setFixedTime(new Date('2026-10-19T04:00:00Z'));
   await page.goto('/');
   const input = page.locator('input[accept=".pdf,.csv"]');
@@ -474,6 +477,10 @@ test('Mac Pulse supports page sizes and direct jumps without narrowing exports',
   const exported = await readFile(await (await downloaded).path(), 'utf8');
   expect(exported.split('\r\n')).toHaveLength(118);
 
+  await ledger.getByRole('searchbox').fill('GROUP');
+  await expectRange('第 1 / 2 页', '第 1–100 笔，共 117 笔');
+  await expect(pageSize).toHaveValue('100');
+  await expect(jump).toHaveValue('1');
   await ledger.getByRole('searchbox').fill('GROUP A');
   await expect(top).toHaveCount(0);
   await expect(bottom).toContainText('第 1 / 1 页');

@@ -11,6 +11,7 @@ it('语言及配色可恢复，无效或禁用存储使用安全默认值', () =
     theme: 'light',
     backupReminderDays: 7,
     idleLockMinutes: 0,
+    macPulsePageSize: 25,
   });
   assert.equal(
     readPreferences({ getItem: () => '{invalid' }, 'zh-HK').locale,
@@ -43,6 +44,7 @@ it('语言及配色可恢复，无效或禁用存储使用安全默认值', () =
     theme: 'jade',
     backupReminderDays: 7,
     idleLockMinutes: 0,
+    macPulsePageSize: 25,
   });
 });
 it('自动锁定默认关闭，仅恢复明确支持的本地时限', () => {
@@ -61,6 +63,24 @@ it('自动锁定默认关闭，仅恢复明确支持的本地时限', () => {
     assert.equal(readPreferences(storage).idleLockMinutes, expected);
     saved = JSON.stringify({ idleLockMinutes: value });
     assert.equal(readPreferences(storage).idleLockMinutes, expected);
+  }
+});
+it('Mac Pulse 仅保存支持的每页笔数，兼容旧偏好且不保存页码', () => {
+  let saved;
+  const storage = {
+    getItem: () => saved,
+    setItem: (_key, raw) => (saved = raw),
+  };
+  for (const value of [25, 50, 100, 0, -1, 75, '50', null]) {
+    const expected = [25, 50, 100].includes(value) ? value : 25;
+    saved = JSON.stringify({ macPulsePageSize: value, page: 4 });
+    assert.equal(readPreferences(storage).macPulsePageSize, expected);
+    savePreferences(
+      { locale: 'zh-CN', theme: 'navy', macPulsePageSize: value, page: 4 },
+      storage,
+    );
+    assert.equal(JSON.parse(saved).macPulsePageSize, expected);
+    assert.equal(Object.hasOwn(JSON.parse(saved), 'page'), false);
   }
 });
 it('翻译动态文案和诊断信息，不更改商户原始文本', () => {
