@@ -91,7 +91,7 @@ import {
 import { isIsoDate } from './core/campaigns.js';
 import { instantiateCampaignRules } from './core/campaign-rules.js';
 
-const TRANSACTION_PAGE_SIZE = 25;
+const TRANSACTION_PAGE_SIZES = [25, 50, 100];
 const emptyFilters = () => ({
   search: '',
   direction: 'all',
@@ -171,6 +171,7 @@ export default function App() {
   const [importPreview, setImportPreview] = useState(null);
   const [filters, setFilters] = useState(emptyFilters);
   const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(TRANSACTION_PAGE_SIZES[0]);
   const [reviewId, setReviewId] = useState(null);
   const [batchIds, setBatchIds] = useState(null);
   const [batchReviewOpen, setBatchReviewOpen] = useState(false);
@@ -282,14 +283,12 @@ export default function App() {
     [bankTransactions],
   );
   const pageCount = showPulseEstimates
-    ? Math.max(1, Math.ceil(filteredList.length / TRANSACTION_PAGE_SIZE))
+    ? Math.max(1, Math.ceil(filteredList.length / pageSize))
     : 1;
   const currentPage = Math.min(page, pageCount - 1);
+  const pageStart = currentPage * pageSize;
   const visibleTransactions = showPulseEstimates
-    ? filteredList.slice(
-        currentPage * TRANSACTION_PAGE_SIZE,
-        (currentPage + 1) * TRANSACTION_PAGE_SIZE,
-      )
+    ? filteredList.slice(pageStart, pageStart + pageSize)
     : filteredList;
   // Changes to the bank or filters reset the list and its selection together.
   useEffect(() => {
@@ -948,10 +947,10 @@ export default function App() {
   const isMac = globalThis.cardpulseDesktop?.platform === 'darwin';
   const compactPulseLedger = isMac && showPulseEstimates;
   const macPulsePageRange =
-    compactPulseLedger && pageCount > 1
+    compactPulseLedger && filteredList.length > 0
       ? t('第 {start}–{end} 笔，共 {count} 笔', {
-          start: currentPage * TRANSACTION_PAGE_SIZE + 1,
-          end: currentPage * TRANSACTION_PAGE_SIZE + visibleTransactions.length,
+          start: pageStart + 1,
+          end: pageStart + visibleTransactions.length,
           count: filteredList.length,
         })
       : undefined;
@@ -961,6 +960,11 @@ export default function App() {
     if (fromFooter || nextPage === 0 || nextPage === pageCount - 1)
       pager?.focus({ preventScroll: true });
     if (fromFooter) pager?.scrollIntoView({ block: 'start' });
+  };
+  const changeMacPulsePageSize = (nextSize) => {
+    setPage(Math.floor(pageStart / nextSize));
+    setPageSize(nextSize);
+    transactionsHeadingRef.current?.scrollIntoView({ block: 'start' });
   };
   const themeLabel = t(isMac ? '配色' : '网站配色');
   const settingsPanels = (
@@ -1722,7 +1726,7 @@ export default function App() {
         {showPulseEstimates && filteredList.length > 0 && (
           <PulseEstimateMethod compact={isMac} today={today} t={t} />
         )}
-        {macPulsePageRange && (
+        {macPulsePageRange && pageCount > 1 && (
           <TransactionPagination
             page={currentPage}
             pageCount={pageCount}
@@ -1903,10 +1907,11 @@ export default function App() {
                 </tbody>
               </table>
             </div>
-            {pageCount > 1 && (
+            {(macPulsePageRange || pageCount > 1) && (
               <TransactionPagination
                 page={currentPage}
                 pageCount={pageCount}
+                pageSize={pageSize}
                 footer={compactPulseLedger}
                 range={macPulsePageRange}
                 onPageChange={
@@ -1914,6 +1919,7 @@ export default function App() {
                     ? (nextPage) => changeMacPulsePage(nextPage, true)
                     : setPage
                 }
+                onPageSizeChange={changeMacPulsePageSize}
                 t={t}
               />
             )}
@@ -2106,12 +2112,46 @@ export default function App() {
 function TransactionPagination({
   page,
   pageCount,
+  pageSize,
   range,
   footer,
   navigationRef,
   onPageChange,
+  onPageSizeChange,
   t,
 }) {
+  const previousButton = (
+    <button
+      type="button"
+      className="btn btn-ghost"
+      disabled={page === 0}
+      onClick={() => onPageChange(page - 1)}
+    >
+      {t('上一页')}
+    </button>
+  );
+  const nextButton = (
+    <button
+      type="button"
+      className="btn btn-ghost"
+      disabled={page === pageCount - 1}
+      onClick={() => onPageChange(page + 1)}
+    >
+      {t('下一页')}
+    </button>
+  );
+  const jumpToPage = (event) => {
+    event.preventDefault();
+    const nextPage = event.currentTarget.elements.page.valueAsNumber - 1;
+    if (
+      Number.isInteger(nextPage) &&
+      nextPage >= 0 &&
+      nextPage < pageCount &&
+      nextPage !== page
+    )
+      onPageChange(nextPage);
+  };
+  const announceStatus = !footer || pageCount === 1;
   return (
     <nav
       className={
@@ -2123,32 +2163,61 @@ function TransactionPagination({
       ref={navigationRef}
       tabIndex={navigationRef ? -1 : undefined}
     >
-      <button
-        type="button"
-        className="btn btn-ghost"
-        disabled={page === 0}
-        onClick={() => onPageChange(page - 1)}
-      >
-        {t('上一页')}
-      </button>
+      {!footer && previousButton}
       <span
         className="transaction-page-status"
-        aria-live={footer ? undefined : 'polite'}
-        aria-atomic={footer ? undefined : true}
+        aria-live={announceStatus ? 'polite' : undefined}
+        aria-atomic={announceStatus ? true : undefined}
       >
         <span>
           {t('第 {page} / {pages} 页', { page: page + 1, pages: pageCount })}
         </span>
         {range && <span className="transaction-page-range">{range}</span>}
       </span>
-      <button
-        type="button"
-        className="btn btn-ghost"
-        disabled={page === pageCount - 1}
-        onClick={() => onPageChange(page + 1)}
-      >
-        {t('下一页')}
-      </button>
+      {footer ? (
+        <div className="transaction-page-controls">
+          <label>
+            {t('每页笔数')}
+            <select
+              value={pageSize}
+              onChange={(event) => onPageSizeChange(Number(event.target.value))}
+            >
+              {TRANSACTION_PAGE_SIZES.map((size) => (
+                <option key={size} value={size}>
+                  {t('{count} 笔', { count: size })}
+                </option>
+              ))}
+            </select>
+          </label>
+          {pageCount > 1 && (
+            <>
+              <form onSubmit={jumpToPage}>
+                <label>
+                  {t('跳到页码')}
+                  <input
+                    key={`${page}-${pageCount}-${pageSize}`}
+                    type="number"
+                    inputMode="numeric"
+                    name="page"
+                    required
+                    min={1}
+                    max={pageCount}
+                    step={1}
+                    defaultValue={page + 1}
+                  />
+                </label>
+                <button type="submit" className="btn btn-ghost">
+                  {t('跳转')}
+                </button>
+              </form>
+              <div className="transaction-page-arrows">
+                {previousButton}
+                {nextButton}
+              </div>
+            </>
+          )}
+        </div>
+      ) : nextButton}
     </nav>
   );
 }

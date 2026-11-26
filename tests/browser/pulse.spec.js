@@ -386,5 +386,115 @@ test('the narrow Mac Pulse ledger keeps its header and footer pager visible whil
 
   await ledger.getByRole('searchbox').fill('HKD SHOP');
   await expect(hkdRow).toBeVisible();
-  await expect(ledger.getByRole('navigation')).toHaveCount(0);
+  const singlePage = ledger.getByRole('navigation', {
+    name: '列表底部交易分頁',
+  });
+  await expect(singlePage).toContainText('第 1–1 筆，共 1 筆');
+  await expect(singlePage.getByLabel('每頁筆數')).toHaveValue('25');
+  await expect(singlePage.getByRole('button')).toHaveCount(0);
+});
+
+test('Mac Pulse supports page sizes and direct jumps without narrowing exports', async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    window.cardpulseDesktop = { platform: 'darwin', readVault: async () => null };
+  });
+  await page.setViewportSize({ width: 680, height: 512 });
+  await page.clock.setFixedTime(new Date('2026-10-19T04:00:00Z'));
+  await page.goto('/');
+  const input = page.locator('input[accept=".pdf,.csv"]');
+  await expect(input).toBeEnabled();
+  const header = 'day,description,amount,currency,direction,category,channel';
+  const transactions = Array.from({ length: 117 }, (_, index) => {
+    const group = index < 60 ? 'A' : 'B';
+    const number = String(index + 1).padStart(3, '0');
+    return `2026-10-01,GROUP ${group} ${number},100.00,CNY,debit,spend,applePay`;
+  });
+  await input.setInputFiles({
+    name: 'pulse-pages.csv',
+    mimeType: 'text/csv',
+    buffer: Buffer.from([header, ...transactions].join('\n')),
+  });
+  await confirmStatementImport(page);
+  const ledger = page.locator('.transactions-section');
+  const rows = ledger.locator('tbody tr');
+  const top = ledger.getByRole('navigation', { name: '交易分页', exact: true });
+  const bottom = ledger.getByRole('navigation', { name: '列表底部交易分页' });
+  const pageSize = bottom.getByLabel('每页笔数');
+  const jump = bottom.getByRole('spinbutton', { name: '跳到页码' });
+  const submit = bottom.getByRole('button', { name: '跳转' });
+  const expectRange = async (status, range) => {
+    for (const pager of [top, bottom]) {
+      await expect(pager).toContainText(status);
+      await expect(pager).toContainText(range);
+    }
+  };
+
+  await expect(pageSize).toHaveValue('25');
+  await expect(pageSize.locator('option')).toHaveText([
+    '25 笔',
+    '50 笔',
+    '100 笔',
+  ]);
+  await expectRange('第 1 / 5 页', '第 1–25 笔，共 117 笔');
+  await rows.nth(8).evaluate((row) => row.scrollIntoView({ block: 'center' }));
+  await expect(bottom).toBeInViewport({ ratio: 1 });
+  await jump.fill('4');
+  await jump.press('Enter');
+  await expectRange('第 4 / 5 页', '第 76–100 笔，共 117 笔');
+  await expect(rows.first()).toContainText('GROUP B 076');
+  await expect(jump).toHaveValue('4');
+
+  await pageSize.selectOption('50');
+  await expectRange('第 2 / 3 页', '第 51–100 笔，共 117 笔');
+  await expect(rows).toHaveCount(50);
+  await expect(rows.first()).toContainText('GROUP A 051');
+  await expect(jump).toHaveValue('2');
+  await expect(jump).toHaveAttribute('max', '3');
+  await pageSize.selectOption('100');
+  await expectRange('第 1 / 2 页', '第 1–100 笔，共 117 笔');
+  await expect(rows).toHaveCount(100);
+  await expect(jump).toHaveValue('1');
+  for (const invalid of ['0', '3', '1.5', '']) {
+    await jump.fill(invalid);
+    await submit.click();
+    expect(await jump.evaluate((input) => input.validity.valid)).toBe(false);
+    await expect(bottom).toContainText('第 1 / 2 页');
+  }
+
+  await jump.fill('2');
+  await submit.click();
+  await expectRange('第 2 / 2 页', '第 101–117 笔，共 117 笔');
+  await expect(rows).toHaveCount(17);
+  await expect(rows.last()).toContainText('GROUP B 117');
+  await expect(bottom.getByRole('button', { name: '下一页' })).toBeDisabled();
+  const downloaded = page.waitForEvent('download');
+  await ledger.getByRole('button', { name: '导出 CSV', exact: true }).click();
+  const exported = await readFile(await (await downloaded).path(), 'utf8');
+  expect(exported.split('\r\n')).toHaveLength(118);
+
+  await ledger.getByRole('searchbox').fill('GROUP A');
+  await expect(top).toHaveCount(0);
+  await expect(bottom).toContainText('第 1 / 1 页');
+  await expect(bottom).toContainText('第 1–60 笔，共 60 笔');
+  await expect(jump).toHaveCount(0);
+  await expect(pageSize).toHaveValue('100');
+  await page.setViewportSize({ width: 600, height: 512 });
+  await pageSize.selectOption('25');
+  await expectRange('第 1 / 3 页', '第 1–25 笔，共 60 笔');
+  await rows.nth(8).evaluate((row) => row.scrollIntoView({ block: 'center' }));
+  await expect(bottom).toBeInViewport({ ratio: 1 });
+  expect(
+    await bottom.evaluate((pager) => pager.scrollWidth <= pager.clientWidth),
+  ).toBe(true);
+  await page.getByLabel('语言', { exact: true }).selectOption('zh-TW');
+  const traditional = ledger.getByRole('navigation', {
+    name: '列表底部交易分頁',
+  });
+  await expect(traditional.getByLabel('每頁筆數')).toHaveValue('25');
+  await expect(
+    traditional.getByRole('spinbutton', { name: '跳到頁碼' }),
+  ).toHaveValue('1');
+  await expect(traditional).toContainText('第 1–25 筆，共 60 筆');
 });

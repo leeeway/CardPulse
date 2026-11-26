@@ -457,6 +457,43 @@
   font-size: 11px;
   font-weight: 400;
 }
+.mac-workspace .transaction-pagination-footer {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+.transaction-page-controls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+}
+.transaction-page-controls :is(label, form, .transaction-page-arrows) {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.transaction-page-controls label {
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.transaction-page-controls :is(input, select) {
+  min-height: 33px;
+  padding: 4px 7px;
+  font-size: 12px;
+}
+.transaction-page-controls input {
+  width: 4.75em;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 660px) {
+  .mac-workspace .transaction-pagination-footer {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .transaction-page-controls {
+    justify-content: space-between;
+  }
+}
 
 @media (min-height: 300px) {
   .mac-workspace .transaction-pagination-footer {
