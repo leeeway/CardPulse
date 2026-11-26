@@ -185,6 +185,7 @@ export default function App() {
   const supplementInputRef = useRef(null);
   const supplementTargetRef = useRef(null);
   const transactionsHeadingRef = useRef(null);
+  const topTransactionPagerRef = useRef(null);
   const backupInputRef = useRef(null);
   const pdfPasswordResolver = useRef(null);
   const unavailable =
@@ -922,6 +923,14 @@ export default function App() {
   };
 
   const isMac = globalThis.cardpulseDesktop?.platform === 'darwin';
+  const compactPulseLedger = isMac && showPulseEstimates;
+  const changeMacPulsePage = (nextPage, fromFooter = false) => {
+    setPage(nextPage);
+    const pager = topTransactionPagerRef.current;
+    if (fromFooter || nextPage === 0 || nextPage === pageCount - 1)
+      pager?.focus({ preventScroll: true });
+    if (fromFooter) pager?.scrollIntoView({ block: 'start' });
+  };
   const themeLabel = t(isMac ? '配色' : '网站配色');
   const settingsPanels = (
     <>
@@ -1682,21 +1691,48 @@ export default function App() {
         {showPulseEstimates && filteredList.length > 0 && (
           <PulseEstimateMethod compact={isMac} today={today} t={t} />
         )}
+        {compactPulseLedger && pageCount > 1 && (
+          <TransactionPagination
+            page={currentPage}
+            pageCount={pageCount}
+            range={t('第 {start}–{end} 笔，共 {count} 笔', {
+              start: currentPage * TRANSACTION_PAGE_SIZE + 1,
+              end:
+                currentPage * TRANSACTION_PAGE_SIZE + visibleTransactions.length,
+              count: filteredList.length,
+            })}
+            navigationRef={topTransactionPagerRef}
+            onPageChange={changeMacPulsePage}
+            t={t}
+          />
+        )}
         {filteredList.length ? (
           <div className="table-container">
-            <table>
+            <table
+              className={compactPulseLedger ? 'mac-pulse-table' : undefined}
+            >
               <thead>
                 <tr>
                   {batchIds && <th scope="col">{t('选择')}</th>}
                   {[
                     isMac ? '记账日期' : '日期',
-                    '银行与卡片',
+                    ...(compactPulseLedger ? [] : ['银行与卡片']),
                     '商户与描述',
-                    '渠道',
+                    ...(compactPulseLedger ? [] : ['渠道']),
                     ...(isMac ? [] : ['币种']),
                     '金额',
                   ].map((label) => (
-                    <th key={label}>{t(label)}</th>
+                    <th
+                      key={label}
+                      scope="col"
+                      className={
+                        label === '金额' && compactPulseLedger
+                          ? 'transaction-amount-column'
+                          : undefined
+                      }
+                    >
+                      {t(label)}
+                    </th>
                   ))}
                   {showPulseEstimates &&
                     (isMac ? (
@@ -1752,24 +1788,20 @@ export default function App() {
                         </small>
                       )}
                     </td>
-                    <td>
-                      <span
-                        className="bank-dot"
-                        style={{ background: getBank(bankOf(tx))?.color }}
-                      />
-                      {bankName(getBank(bankOf(tx)))}
-                      <small className="transaction-card">
-                        {t(
-                          cardName(
-                            isMac && isPulseTransaction(tx)
-                              ? 'hsbc_pulse'
-                              : tx.ruleId,
-                          ),
-                        )}{' '}
-                        ···· {tx.last4 || t('未知')}
-                      </small>
-                    </td>
-                    <td>
+                    {!compactPulseLedger && (
+                      <td>
+                        <TransactionCard
+                          transaction={tx}
+                          bankName={bankName}
+                          t={t}
+                        />
+                      </td>
+                    )}
+                    <td
+                      className={
+                        compactPulseLedger ? 'transaction-merchant' : undefined
+                      }
+                    >
                       <strong>{tx.description}</strong>
                       <small>
                         {t(
@@ -1784,26 +1816,36 @@ export default function App() {
                       {tx.notes?.length > 0 && (
                         <small>{tx.notes.join(' · ')}</small>
                       )}
+                      {compactPulseLedger && (
+                        <div className="transaction-meta">
+                          <span>
+                            <TransactionCard
+                              compact
+                              transaction={tx}
+                              bankName={bankName}
+                              t={t}
+                            />
+                          </span>
+                          <TransactionChannel transaction={tx} t={t} />
+                        </div>
+                      )}
                     </td>
-                    <td>
-                      <span
-                        className={`badge-tag ${tx.channel?.pulse ? 'eligible-channel' : ''}`}
-                      >
-                        {t(
-                          tx.channel?.uncertain
-                            ? '待确认渠道'
-                            : channelText(tx.channel?.key),
-                        )}
-                      </span>
-                    </td>
+                    {!compactPulseLedger && (
+                      <td>
+                        <TransactionChannel transaction={tx} t={t} />
+                      </td>
+                    )}
                     {!isMac && <td>{tx.currency}</td>}
                     <td
-                      className={`amount ${tx.direction === 'credit' ? 'text-credit' : ''}`}
+                      className={`amount ${compactPulseLedger ? 'transaction-amount-column' : ''} ${tx.direction === 'credit' ? 'text-credit' : ''}`}
                     >
                       {isMac && (
-                        <span className="transaction-currency">
-                          {tx.currency}
-                        </span>
+                        <>
+                          <span className="transaction-currency">
+                            {tx.currency}
+                          </span>
+                          {'\u00a0'}
+                        </>
                       )}
                       {tx.direction === 'credit' ? '−' : '+'}
                       {tx.amount}
@@ -1848,30 +1890,17 @@ export default function App() {
           </div>
         )}
         {pageCount > 1 && (
-          <nav className="transaction-pagination" aria-label={t('交易分页')}>
-            <button
-              type="button"
-              className="btn btn-ghost"
-              disabled={currentPage === 0}
-              onClick={() => setPage(currentPage - 1)}
-            >
-              {t('上一页')}
-            </button>
-            <span aria-live="polite">
-              {t('第 {page} / {pages} 页', {
-                page: currentPage + 1,
-                pages: pageCount,
-              })}
-            </span>
-            <button
-              type="button"
-              className="btn btn-ghost"
-              disabled={currentPage === pageCount - 1}
-              onClick={() => setPage(currentPage + 1)}
-            >
-              {t('下一页')}
-            </button>
-          </nav>
+          <TransactionPagination
+            page={currentPage}
+            pageCount={pageCount}
+            footer={compactPulseLedger}
+            onPageChange={
+              compactPulseLedger
+                ? (nextPage) => changeMacPulsePage(nextPage, true)
+                : setPage
+            }
+            t={t}
+          />
         )}
       </section>
       {isMac && (
@@ -2043,6 +2072,81 @@ export default function App() {
     </div>
   );
 }
+function TransactionPagination({
+  page,
+  pageCount,
+  range,
+  footer,
+  navigationRef,
+  onPageChange,
+  t,
+}) {
+  return (
+    <nav
+      className="transaction-pagination"
+      aria-label={t(footer ? '列表底部交易分页' : '交易分页')}
+      ref={navigationRef}
+      tabIndex={navigationRef ? -1 : undefined}
+    >
+      <button
+        type="button"
+        className="btn btn-ghost"
+        disabled={page === 0}
+        onClick={() => onPageChange(page - 1)}
+      >
+        {t('上一页')}
+      </button>
+      <span
+        className="transaction-page-status"
+        aria-live={footer ? undefined : 'polite'}
+        aria-atomic={footer ? undefined : true}
+      >
+        <span>
+          {t('第 {page} / {pages} 页', { page: page + 1, pages: pageCount })}
+        </span>
+        {range && <span className="transaction-page-range">{range}</span>}
+      </span>
+      <button
+        type="button"
+        className="btn btn-ghost"
+        disabled={page === pageCount - 1}
+        onClick={() => onPageChange(page + 1)}
+      >
+        {t('下一页')}
+      </button>
+    </nav>
+  );
+}
+function TransactionCard({ transaction, compact, bankName, t }) {
+  const bank = getBank(bankOf(transaction));
+  const card =
+    compact && isPulseTransaction(transaction)
+      ? 'hsbc_pulse'
+      : transaction.ruleId;
+  return (
+    <>
+      <span className="bank-dot" style={{ background: bank?.color }} />
+      {bankName(bank)}
+      {compact && ' · '}
+      <small className="transaction-card">
+        {t(cardName(card))} ···· {transaction.last4 || t('未知')}
+      </small>
+    </>
+  );
+}
+function TransactionChannel({ transaction, t }) {
+  return (
+    <span
+      className={`badge-tag ${transaction.channel?.pulse ? 'eligible-channel' : ''}`}
+    >
+      {t(
+        transaction.channel?.uncertain
+          ? '待确认渠道'
+          : channelText(transaction.channel?.key),
+      )}
+    </span>
+  );
+}
 function PulseEstimateMethod({ compact, today, t }) {
   const explanation = (
     <p className="muted small pulse-estimate-summary">
@@ -2089,17 +2193,23 @@ function PulseTransactionEstimate({
       <td className="pulse-estimate-column transaction-reward">
         {allocation ? (
           <>
-            <span className="amount">
-              {transaction.currency}{' '}
-              {fromScaledBigInt(
-                refund ? -allocation.clawback : allocation.cashback,
-              )}
-            </span>
-            <span className="transaction-reward-rate">
-              {allocation.ratePercent.toFixed(1)}%
+            <div className="transaction-reward-result">
+              <span className="transaction-reward-label">
+                {t(refund ? '退款扣回估算' : '封顶后返现估算')}
+              </span>{' '}
+              <span className="amount">
+                {transaction.currency}{'\u00a0'}
+                {fromScaledBigInt(
+                  refund ? -allocation.clawback : allocation.cashback,
+                )}
+              </span>
+            </div>
+            <span className="transaction-reward-label">
+              {t('适用比例')}{' '}
+              <strong>{allocation.ratePercent.toFixed(1)}%</strong>
             </span>
             <details>
-              <summary>{t(refund ? '退款扣回估算' : '封顶后返现估算')}</summary>
+              <summary>{t('返现明细')}</summary>
               <small>
                 {t('封顶前返现估算')} · {transaction.currency}{' '}
                 {fromScaledBigInt(allocation.beforeCapCashback)}

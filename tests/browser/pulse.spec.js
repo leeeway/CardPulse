@@ -229,3 +229,85 @@ test('Pulse ledger pages filtered rows, preserves selections and exports across 
   }
   expect(content).not.toContain('SKIP THIS');
 });
+
+test('the narrow Mac Pulse ledger keeps original-currency amounts and both pagers visible', async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    window.cardpulseDesktop = { platform: 'darwin', readVault: async () => null };
+  });
+  await page.setViewportSize({ width: 840, height: 640 });
+  await page.clock.setFixedTime(new Date('2026-10-19T04:00:00Z'));
+  await page.goto('/');
+  const input = page.locator('input[accept=".pdf,.csv"]');
+  await expect(input).toBeEnabled();
+  const longMerchant = 'LONGMERCHANTREFERENCE'.repeat(9);
+  const records = [
+    'day,description,amount,currency,direction,category,channel,last4',
+    `2026-10-02,${longMerchant},230.00,CNY,debit,spend,applePay,1234`,
+    '2026-10-02,HKD SHOP,12345.00,HKD,debit,spend,standard,1234',
+    '2026-10-02,REFUND,230.00,CNY,credit,credit,applePay,1234',
+    ...Array.from(
+      { length: 25 },
+      (_, index) =>
+        `2026-10-01,STORE ${index + 1},100.00,CNY,debit,spend,applePay,1234`,
+    ),
+    '2026-01-01,ANNUAL CAP,100000.00,CNY,debit,spend,applePay,1234',
+  ];
+  await input.setInputFiles({
+    name: 'mac-pulse.csv',
+    mimeType: 'text/csv',
+    buffer: Buffer.from(records.join('\n')),
+  });
+  await confirmStatementImport(page);
+  const ledger = page.locator('.transactions-section');
+  const rows = ledger.getByRole('row');
+  const longRow = rows.filter({ hasText: longMerchant });
+  const hkdRow = rows.filter({ hasText: 'HKD SHOP' });
+  const refundRow = rows.filter({ hasText: 'REFUND' });
+  const topPager = ledger.getByRole('navigation', {
+    name: '交易分页',
+    exact: true,
+  });
+  const bottomPager = ledger.getByRole('navigation', { name: '列表底部交易分页' });
+  await expect(topPager).toContainText('第 1–25 笔，共 29 笔');
+  await expect(topPager.getByRole('button', { name: '上一页' })).toBeDisabled();
+  await expect(longRow).toContainText('汇丰 · HSBC Pulse ···· 1234');
+  await expect(longRow).toContainText('Apple Pay');
+  await expect(longRow.getByRole('cell', { name: 'CNY +230.00' })).toBeVisible();
+  await expect(longRow).toContainText('封顶后返现估算 CNY 5.52');
+  await expect(longRow).toContainText('适用比例 4.4%');
+  await longRow.getByText('返现明细', { exact: true }).click();
+  await expect(longRow.getByText('封顶前返现估算 · CNY 10.12')).toBeVisible();
+  await expect(hkdRow).toContainText('HKD +12345.00');
+  await expect(hkdRow).toContainText('HKD 49.38');
+  await expect(hkdRow).toContainText('适用比例 0.4%');
+  await expect(refundRow).toContainText('CNY −230.00');
+  await expect(refundRow).toContainText('退款扣回估算 CNY -10.12');
+
+  await ledger.getByRole('button', { name: '选择交易', exact: true }).click();
+  await expect(
+    await ledger.locator('.table-container').evaluate((element) => ({
+      pageFits: document.documentElement.scrollWidth <= innerWidth,
+      tableFits: element.scrollWidth <= element.clientWidth,
+    })),
+  ).toEqual({ pageFits: true, tableFits: true });
+  await longRow.getByRole('checkbox').check();
+  await bottomPager.getByRole('button', { name: '下一页' }).click();
+  await expect(topPager).toBeFocused();
+  await expect(topPager).toBeInViewport({ ratio: 1 });
+  await expect(topPager).toContainText('第 26–29 笔，共 29 笔');
+  await expect(topPager.getByRole('button', { name: '下一页' })).toBeDisabled();
+  const previous = topPager.getByRole('button', { name: '上一页' });
+  await previous.focus();
+  await previous.press('Enter');
+  await expect(topPager).toBeFocused();
+  await expect(longRow.getByRole('checkbox')).toBeChecked();
+
+  await page.getByLabel('语言', { exact: true }).selectOption('zh-TW');
+  await expect(
+    ledger.getByRole('navigation', { name: '交易分頁', exact: true }),
+  ).toContainText('第 1–25 筆，共 29 筆');
+  await expect(longRow).toContainText('設限後回贈估算 CNY 5.52');
+  await expect(longRow).toContainText('適用比例 4.4%');
+});
