@@ -1,5 +1,6 @@
 .mac-workspace {
   --workspace-gutter: clamp(20px, 3vw, 38px);
+  --workspace-header-height: 62px;
   --workspace-line: color-mix(in srgb, var(--border) 75%, transparent);
   --workspace-surface: color-mix(
     in srgb,
@@ -78,9 +79,10 @@
     #import-heading,
     #transactions-heading,
     #campaign-heading,
-    #workspace-settings-heading
+    #workspace-settings-heading,
+    .transaction-pagination
   ) {
-  scroll-margin-top: 84px;
+  scroll-margin-top: calc(var(--workspace-header-height) + 22px);
 }
 
 .mac-workspace .page-intro {
@@ -387,6 +389,10 @@
   text-align: right;
   white-space: normal;
 }
+.mac-pulse-table .transaction-value {
+  display: inline-block;
+  max-width: 100%;
+}
 .mac-pulse-table .pulse-estimate-column {
   width: 25%;
 }
@@ -427,7 +433,6 @@
   border: 1px solid var(--workspace-line);
   border-radius: 8px;
   background: var(--workspace-surface);
-  scroll-margin-top: 84px;
 }
 .mac-workspace .transaction-pagination .btn {
   border-color: var(--border);
@@ -477,6 +482,19 @@
   }
 }
 
+@media (min-width: 560px) {
+  .mac-workspace .table-container:has(> .mac-pulse-table) {
+    /* Keep the rounded clip without making the wrapper a scroll container. */
+    overflow: clip;
+  }
+  .mac-pulse-table thead {
+    position: sticky;
+    z-index: 1;
+    top: var(--workspace-header-height);
+    box-shadow: 0 1px var(--border);
+  }
+}
+
 @media (max-width: 760px) {
   .mac-workspace .header {
     flex-direction: row;
@@ -487,16 +505,6 @@
     order: 1;
     justify-content: flex-start;
     width: 100%;
-  }
-  .mac-workspace
-    :is(
-      #import-heading,
-      #transactions-heading,
-      #campaign-heading,
-    #workspace-settings-heading,
-    .transaction-pagination
-    ) {
-    scroll-margin-top: 115px;
   }
   .mac-workspace .import-panel,
   .workspace-settings-grid {

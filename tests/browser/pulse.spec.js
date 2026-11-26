@@ -230,7 +230,7 @@ test('Pulse ledger pages filtered rows, preserves selections and exports across 
   expect(content).not.toContain('SKIP THIS');
 });
 
-test('the narrow Mac Pulse ledger keeps original-currency amounts and both pagers visible', async ({
+test('the narrow Mac Pulse ledger pins column headers, shows original currency and supports both pagers', async ({
   page,
 }) => {
   await page.addInitScript(() => {
@@ -284,6 +284,45 @@ test('the narrow Mac Pulse ledger keeps original-currency amounts and both pager
   await expect(hkdRow).toContainText('适用比例 0.4%');
   await expect(refundRow).toContainText('CNY −230.00');
   await expect(refundRow).toContainText('退款扣回估算 CNY -10.12');
+
+  const table = ledger.getByRole('table');
+  const tableHeader = table.locator('thead');
+  const headerOffset = (edge) =>
+    tableHeader.evaluate((header, side) => {
+      const navigation = document.querySelector('.mac-workspace .header');
+      return (
+        header.getBoundingClientRect()[side] -
+        navigation.getBoundingClientRect().bottom
+      );
+    }, edge);
+  await expect(
+    tableHeader.getByRole('columnheader', { name: '金额' }),
+  ).toBeVisible();
+  await expect(
+    tableHeader.getByRole('columnheader', { name: 'Pulse 返现' }),
+  ).toBeVisible();
+  for (const width of [840, 680]) {
+    await page.setViewportSize({ width, height: 640 });
+    await rows.nth(8).evaluate((row) => row.scrollIntoView({ block: 'center' }));
+    await expect
+      .poll(async () => Math.abs(await headerOffset('top')))
+      .toBeLessThanOrEqual(1);
+    await expect(tableHeader).toBeInViewport({ ratio: 1 });
+    const amountLines = await hkdRow
+      .locator('.transaction-value')
+      .evaluate((amount) => {
+        const range = document.createRange();
+        range.selectNodeContents(amount);
+        return new Set(Array.from(range.getClientRects(), (rect) => rect.top))
+          .size;
+      });
+    expect(amountLines).toBe(1);
+  }
+  await page.locator('#campaign-heading').evaluate((heading) => {
+    heading.scrollIntoView({ block: 'start' });
+  });
+  await expect.poll(() => headerOffset('bottom')).toBeLessThanOrEqual(1);
+  await page.setViewportSize({ width: 840, height: 640 });
 
   await ledger.getByRole('button', { name: '选择交易', exact: true }).click();
   await expect(

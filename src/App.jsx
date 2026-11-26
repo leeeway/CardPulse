@@ -1,4 +1,10 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, {
+  useState,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+} from 'react';
 import {
   CreditCard,
   UploadCloud,
@@ -184,6 +190,7 @@ export default function App() {
   const fileInputRef = useRef(null);
   const supplementInputRef = useRef(null);
   const supplementTargetRef = useRef(null);
+  const workspaceHeaderRef = useRef(null);
   const transactionsHeadingRef = useRef(null);
   const topTransactionPagerRef = useRef(null);
   const backupInputRef = useRef(null);
@@ -209,6 +216,22 @@ export default function App() {
     loadingFile ||
     vaultBusy ||
     rateBusy;
+
+  useLayoutEffect(() => {
+    const header = workspaceHeaderRef.current;
+    if (!header) return;
+    const workspace = header.parentElement;
+    const measureHeader = () => {
+      workspace.style.setProperty(
+        '--workspace-header-height',
+        `${header.getBoundingClientRect().height}px`,
+      );
+    };
+    measureHeader();
+    const observer = new ResizeObserver(measureHeader);
+    observer.observe(header, { box: 'border-box' });
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     document.documentElement.lang = preferences.locale;
@@ -1197,7 +1220,7 @@ export default function App() {
   );
   return (
     <div className={isMac ? 'app-container mac-workspace' : 'app-container'}>
-      <header className="header">
+      <header className="header" ref={isMac ? workspaceHeaderRef : undefined}>
         <div className="brand-wrapper">
           <div className="brand-logo">
             <CreditCard size={23} />
@@ -1844,11 +1867,13 @@ export default function App() {
                           <span className="transaction-currency">
                             {tx.currency}
                           </span>
-                          {'\u00a0'}
+                          {' '}
                         </>
                       )}
-                      {tx.direction === 'credit' ? '−' : '+'}
-                      {tx.amount}
+                      <span className="transaction-value">
+                        {tx.direction === 'credit' ? '−' : '+'}
+                        {tx.amount}
+                      </span>
                     </td>
                     {showPulseEstimates && (
                       <PulseTransactionEstimate
