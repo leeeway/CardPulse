@@ -230,7 +230,7 @@ test('Pulse ledger pages filtered rows, preserves selections and exports across 
   expect(content).not.toContain('SKIP THIS');
 });
 
-test('the narrow Mac Pulse ledger pins column headers, shows original currency and supports both pagers', async ({
+test('the narrow Mac Pulse ledger keeps its header and footer pager visible while scrolling', async ({
   page,
 }) => {
   await page.addInitScript(() => {
@@ -308,6 +308,23 @@ test('the narrow Mac Pulse ledger pins column headers, shows original currency a
       .poll(async () => Math.abs(await headerOffset('top')))
       .toBeLessThanOrEqual(1);
     await expect(tableHeader).toBeInViewport({ ratio: 1 });
+    await expect(bottomPager).toBeInViewport({ ratio: 1 });
+    await expect(bottomPager).toContainText('第 1 / 2 页');
+    await expect(bottomPager).toContainText('第 1–25 笔，共 29 笔');
+    const footer = await bottomPager.evaluate((pager) => {
+      const bounds = pager.getBoundingClientRect();
+      const header = pager
+        .closest('.transactions-section')
+        .querySelector('thead')
+        .getBoundingClientRect();
+      return {
+        gap: innerHeight - bounds.bottom,
+        room: bounds.top - header.bottom,
+      };
+    });
+    expect(footer.gap).toBeGreaterThanOrEqual(0);
+    expect(footer.gap).toBeLessThanOrEqual(16);
+    expect(footer.room).toBeGreaterThan(100);
     const amountLines = await hkdRow
       .locator('.transaction-value')
       .evaluate((amount) => {
@@ -322,6 +339,17 @@ test('the narrow Mac Pulse ledger pins column headers, shows original currency a
     heading.scrollIntoView({ block: 'start' });
   });
   await expect.poll(() => headerOffset('bottom')).toBeLessThanOrEqual(1);
+  await expect
+    .poll(() =>
+      bottomPager.evaluate((pager) => {
+        const navigation = document.querySelector('.mac-workspace .header');
+        return (
+          pager.getBoundingClientRect().bottom -
+          navigation.getBoundingClientRect().bottom
+        );
+      }),
+    )
+    .toBeLessThanOrEqual(1);
   await page.setViewportSize({ width: 840, height: 640 });
 
   await ledger.getByRole('button', { name: '选择交易', exact: true }).click();
@@ -332,12 +360,15 @@ test('the narrow Mac Pulse ledger pins column headers, shows original currency a
     })),
   ).toEqual({ pageFits: true, tableFits: true });
   await longRow.getByRole('checkbox').check();
+  await rows.nth(8).evaluate((row) => row.scrollIntoView({ block: 'center' }));
+  await expect(bottomPager).toBeInViewport({ ratio: 1 });
   await bottomPager.getByRole('button', { name: '下一页' }).click();
   await expect(topPager).toBeFocused();
   await expect(topPager).toBeInViewport({ ratio: 1 });
   await expect(topPager).toContainText('第 26–29 笔，共 29 笔');
-  await expect(topPager.getByRole('button', { name: '下一页' })).toBeDisabled();
-  const previous = topPager.getByRole('button', { name: '上一页' });
+  await expect(bottomPager).toContainText('第 26–29 笔，共 29 笔');
+  await expect(bottomPager.getByRole('button', { name: '下一页' })).toBeDisabled();
+  const previous = bottomPager.getByRole('button', { name: '上一页' });
   await previous.focus();
   await previous.press('Enter');
   await expect(topPager).toBeFocused();
@@ -347,6 +378,13 @@ test('the narrow Mac Pulse ledger pins column headers, shows original currency a
   await expect(
     ledger.getByRole('navigation', { name: '交易分頁', exact: true }),
   ).toContainText('第 1–25 筆，共 29 筆');
+  await expect(
+    ledger.getByRole('navigation', { name: '列表底部交易分頁' }),
+  ).toContainText('第 1–25 筆，共 29 筆');
   await expect(longRow).toContainText('設限後回贈估算 CNY 5.52');
   await expect(longRow).toContainText('適用比例 4.4%');
+
+  await ledger.getByRole('searchbox').fill('HKD SHOP');
+  await expect(hkdRow).toBeVisible();
+  await expect(ledger.getByRole('navigation')).toHaveCount(0);
 });

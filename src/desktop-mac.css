@@ -458,6 +458,15 @@
   font-weight: 400;
 }
 
+@media (min-height: 300px) {
+  .mac-workspace .transaction-pagination-footer {
+    position: sticky;
+    z-index: 2;
+    bottom: 8px;
+    box-shadow: 0 -3px 12px color-mix(in srgb, var(--bg-primary) 60%, transparent);
+  }
+}
+
 .workspace-settings > h2 {
   margin-bottom: 9px;
 }
