@@ -1,6 +1,7 @@
 import { cents, formatCents } from './reconciliation.js';
 import { isIsoDate } from './campaigns.js';
 import { cardsFor, getBank } from './banks.js';
+import { categoryForTransaction } from './review.js';
 
 export const CSV_TEMPLATE =
   'day,transactionDay,description,amount,currency,direction,category,last4,channel\r\n2026-10-01,2026-10-01,EXAMPLE SHOP,100.00,HKD,debit,spend,1234,online\r\n';
@@ -89,8 +90,7 @@ export function parseStandardCsv(text, fileName, { bankId, cardId } = {}) {
         !['debit', 'credit'].includes(tx.direction)
       )
         throw new Error('币种或收支方向无效');
-      const category =
-        tx.category || (tx.direction === 'credit' ? 'credit' : 'spend');
+      const category = categoryForTransaction(tx);
       if (!['spend', 'credit', 'repayment', 'fee'].includes(category))
         throw new Error('交易分类无效');
       if (

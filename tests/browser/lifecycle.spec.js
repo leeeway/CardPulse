@@ -8,6 +8,7 @@ import {
   parseBackup,
 } from '../../src/core/backup.js';
 import { emptyWorkspace } from '../../src/core/workspace.js';
+import { encryptData } from '../../src/core/crypto.js';
 
 const savedCampaign = {
   id: 'saved-campaign',
@@ -21,6 +22,95 @@ const savedCampaign = {
   dateBasis: 'posting',
   channel: 'any',
 };
+
+test('closing protects unapplied FX and campaign drafts', async ({ page }) => {
+  await page.goto('/');
+  const guarded = () =>
+    page.evaluate(() => {
+      const event = new Event('beforeunload', { cancelable: true });
+      window.dispatchEvent(event);
+      return event.defaultPrevented;
+    });
+  const rate = page.getByLabel('参考汇率（1 HKD = CNY）', { exact: true });
+  await expect(rate).toBeEnabled();
+  expect(await guarded()).toBe(false);
+  await rate.fill('0.93');
+  await expect.poll(guarded).toBe(true);
+  await rate.fill('');
+  await expect.poll(guarded).toBe(false);
+  await page.getByRole('button', { name: '添加活动', exact: true }).click();
+  await page.getByLabel('活动名称', { exact: true }).fill('Unsaved fixture');
+  await expect.poll(guarded).toBe(true);
+  await page.locator('.campaign-form').getByRole('button', { name: '取消' }).click();
+  await expect.poll(guarded).toBe(false);
+});
+
+test('an out-of-range online rate cannot prevent reopening the vault', async ({
+  page,
+}) => {
+  const password = 'old fixture password';
+  const payload = await encryptData(
+    {
+      ...emptyWorkspace(),
+      transactions: [
+        {
+          id: 'old-refund',
+          day: '2026-01-01',
+          description: 'OLD REFUND',
+          amount: '100.00',
+          currency: 'HKD',
+          direction: 'credit',
+        },
+      ],
+      exchangeRate: { rate: 10001, source: 'Frankfurter', date: '2026-01-01' },
+    },
+    password,
+  );
+  await page.route('https://api.frankfurter.dev/**', (route) =>
+    route.fulfill({ json: { rate: 10001, date: '2026-01-02' } }),
+  );
+  await page.goto('/');
+  await expect(page.locator('input[accept=".pdf,.csv"]')).toBeEnabled();
+  // Recreate the ciphertext written by the older app, prior to validation.
+  await page.evaluate((value) => new Promise((resolve, reject) => {
+    const request = indexedDB.open('CardPulse_DB', 1);
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      const db = request.result;
+      const tx = db.transaction('vault', 'readwrite');
+      tx.objectStore('vault').put({ id: 'vault_payload', payload: value });
+      tx.oncomplete = () => { db.close(); resolve(); };
+      tx.onabort = () => { db.close(); reject(tx.error); };
+    };
+  }), payload);
+  const button = (name) => page.getByRole('button', { name, exact: true });
+  const unlock = async () => {
+    await button('解锁本地库').click();
+    await page.getByLabel('主密码', { exact: true }).fill(password);
+    await button('解锁数据').click();
+    await expect(page.getByRole('dialog')).toBeHidden();
+  };
+  const status = page.locator('.workspace-status');
+  await page.reload();
+  await unlock();
+  await expect(status).toContainText('已移除旧版保存的异常汇率');
+  await page.getByLabel('分类', { exact: true }).selectOption('credit');
+  await expect(page.locator('.transactions-section tbody')).toContainText('OLD REFUND');
+  const rate = page.getByLabel('参考汇率（1 HKD = CNY）', { exact: true });
+  await rate.fill('0.93');
+  await button('应用手动汇率').click();
+  await button('联网更新参考汇率').click();
+  await expect(status).toContainText('汇率暂不可用');
+  await expect(rate).toHaveValue('0.93');
+  await button('保存到加密库').click();
+  await page.getByLabel('主密码', { exact: true }).fill(password);
+  await button('加密保存').click();
+  await expect(status).toContainText('已加密保存到本地保险库');
+  await page.reload();
+  await unlock();
+  await expect(rate).toHaveValue('0.93');
+  await expect(page.locator('.transactions-section tbody')).toContainText('OLD REFUND');
+});
 
 test('lock, clear and successful restore discard campaign editor drafts', async ({
   page,

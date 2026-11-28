@@ -1,7 +1,7 @@
 const fs = require('node:fs/promises');
 const path = require('node:path');
 const { randomUUID } = require('node:crypto');
-const MAX_VAULT_BYTES = 50 * 1024 * 1024;
+const { maxPayloadBytes: MAX_VAULT_BYTES } = require('./vault-format.json');
 function validatePayload(payload) {
   if (
     typeof payload !== 'string' ||

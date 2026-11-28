@@ -1,0 +1,6 @@
+{
+  "maxPayloadBytes": 52428800,
+  "saltBytes": 16,
+  "ivBytes": 12,
+  "tagBytes": 16
+}

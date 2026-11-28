@@ -182,7 +182,7 @@ function createWindow() {
       cancelId: 0,
       message: 'Unsaved changes / 存在未保存修改',
       detail:
-        'Save to the encrypted vault before closing to keep your changes. / 请先保存到加密库。',
+        'Apply any open drafts and save to the encrypted vault before closing. / 请先提交活动或应用汇率草稿，再保存到加密库。',
     });
     if (choice === 1) event.preventDefault();
   });

@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   categoriesFor,
+  categoryForTransaction,
   categoryText,
   canRestoreImportedReview,
   REVIEW_CHANNELS,
@@ -17,7 +18,7 @@ export default function TransactionReviewDialog({
 }) {
   const dialogRef = useRef(null);
   const [category, setCategory] = useState(
-    transaction.category || categoriesFor(transaction.direction)[0],
+    categoryForTransaction(transaction),
   );
   const channels = REVIEW_CHANNELS.filter(
     (key) => key !== 'baseOnly' || transaction.currency === 'HKD',

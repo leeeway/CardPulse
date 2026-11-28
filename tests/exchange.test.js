@@ -12,6 +12,10 @@ it('获取汇率时不传递凭证，失败或无效汇率不提供猜测值', a
   assert.equal((await fetchHkdCnyRate()).rate, 0.92);
   response = { rate: -1 };
   assert.equal((await fetchHkdCnyRate()).rate, null);
+  response = { rate: 10001, date: '2026-01-02' };
+  assert.equal((await fetchHkdCnyRate()).rate, null);
+  response = { rate: 0.92, date: '2026-02-30' };
+  assert.equal((await fetchHkdCnyRate()).rate, null);
   globalThis.fetch.mock.mockImplementation(async () => { throw new Error('offline'); });
   assert.equal((await fetchHkdCnyRate()).rate, null);
   const controller = new AbortController();

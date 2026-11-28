@@ -1,6 +1,6 @@
-import { encryptData, decryptData } from './crypto.js';
+import { encryptData, decryptData, MAX_VAULT_PAYLOAD_BYTES } from './crypto.js';
 import { normalizeWorkspace } from './workspace.js';
-export const MAX_BACKUP_BYTES = 50 * 1024 * 1024;
+export const MAX_BACKUP_BYTES = MAX_VAULT_PAYLOAD_BYTES;
 export function validateEncryptedPayload(payload) {
   if (
     typeof payload !== 'string' ||

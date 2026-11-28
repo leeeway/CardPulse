@@ -8,6 +8,21 @@ import { calculateRewards } from '../src/core/rewards.js';
 import { translate } from '../src/core/i18n.js';
 
 describe('交易工具与安全 CSV 导出', () => {
+  it('旧记录按收支方向补足显示分类，筛选和导出一致', () => {
+    const old = [
+      { id: 'purchase', direction: 'debit' },
+      { id: 'refund', direction: 'credit' },
+      { id: 'payment', direction: 'credit', category: 'repayment' },
+    ];
+    assert.deepEqual(filterTransactions(old, { category: 'spend' }), [old[0]]);
+    assert.deepEqual(filterTransactions(old, { category: 'credit' }), [old[1]]);
+    assert.deepEqual(filterTransactions(old, { category: 'repayment' }), [old[2]]);
+    const rows = exportToSafeCsv(old).split('\r\n').slice(1);
+    assert.deepEqual(
+      rows.map((row) => row.split(',')[8]),
+      ['"spend"', '"credit"', '"repayment"'],
+    );
+  });
   const sampleTxs = [
     {
       id: '1',

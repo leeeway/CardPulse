@@ -4,12 +4,37 @@
  * 确保所有卡号与结单账目在本地持久化时均为加密密文，私钥永不离端
  */
 
+import vaultFormat from '../../desktop/vault-format.json' with { type: 'json' };
+
 const PBKDF2_ITERATIONS = 100000;
-const SALT_BYTES = 16;
-const IV_BYTES = 12;
+const { saltBytes, ivBytes, tagBytes } = vaultFormat;
+export const MAX_VAULT_PAYLOAD_BYTES = vaultFormat.maxPayloadBytes;
+
+function encodeVaultData(data) {
+  const plaintext = typeof data === 'string' ? data : JSON.stringify(data);
+  const encoded = new TextEncoder().encode(plaintext);
+  // The payload encodes the salt, IV, ciphertext and authentication tag in hex.
+  const payloadBytes = 2 * (saltBytes + ivBytes + encoded.length + tagBytes) + 2;
+  if (payloadBytes > MAX_VAULT_PAYLOAD_BYTES)
+    throw new Error('工作区超过加密容量上限，请减少交易或活动后重试。');
+  return encoded;
+}
+
+export function assertVaultCapacity(data) {
+  encodeVaultData(data);
+}
 
 function bufferToHex(buffer) {
-  return [...new Uint8Array(buffer)].map(b => b.toString(16).padStart(2, '0')).join('');
+  const bytes = new Uint8Array(buffer);
+  const chunks = [];
+  for (let start = 0; start < bytes.length; start += 8192) {
+    chunks.push(
+      Array.from(bytes.subarray(start, start + 8192), (byte) =>
+        byte.toString(16).padStart(2, '0'),
+      ).join(''),
+    );
+  }
+  return chunks.join('');
 }
 
 function hexToBuffer(hex) {
@@ -53,16 +78,15 @@ async function deriveKey(password, salt) {
  */
 export async function encryptData(data, password) {
   if (!password) throw new Error('加密必须提供密码');
-  const salt = crypto.getRandomValues(new Uint8Array(SALT_BYTES));
-  const iv = crypto.getRandomValues(new Uint8Array(IV_BYTES));
+  const plaintext = encodeVaultData(data);
+  const salt = crypto.getRandomValues(new Uint8Array(saltBytes));
+  const iv = crypto.getRandomValues(new Uint8Array(ivBytes));
   const key = await deriveKey(password, salt);
 
-  const enc = new TextEncoder();
-  const plaintext = typeof data === 'string' ? data : JSON.stringify(data);
   const encrypted = await crypto.subtle.encrypt(
-    { name: 'AES-GCM', iv },
+    { name: 'AES-GCM', iv, tagLength: tagBytes * 8 },
     key,
-    enc.encode(plaintext)
+    plaintext
   );
 
   return `${bufferToHex(salt)}:${bufferToHex(iv)}:${bufferToHex(encrypted)}`;

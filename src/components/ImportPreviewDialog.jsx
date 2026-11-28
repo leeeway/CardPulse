@@ -274,6 +274,7 @@ export default function ImportPreviewDialog({
     transactions,
     duplicates,
     supplementId,
+    capacityWarning,
   } = preview;
   const pendingLabel = supplementId ? '待补录' : '待导入';
   const skippedLabel = supplementId ? '未勾选' : '已跳过';
@@ -487,6 +488,11 @@ export default function ImportPreviewDialog({
         </section>
       </div>
       <footer className="form-actions import-preview-footer">
+        {capacityWarning && (
+          <p className="import-preview-total error small" role="alert">
+            {t(capacityWarning)} {t('可取消勾选部分交易后重试。')}
+          </p>
+        )}
         <p
           className="import-preview-total small"
           aria-live="polite"

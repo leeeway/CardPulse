@@ -1,6 +1,11 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { encryptData, decryptData } from '../src/core/crypto.js';
+import {
+  assertVaultCapacity,
+  encryptData,
+  decryptData,
+  MAX_VAULT_PAYLOAD_BYTES,
+} from '../src/core/crypto.js';
 
 describe('端侧 Web Crypto 加解密模块', () => {
   it('正确加密与解密字符串', async () => {
@@ -34,5 +39,14 @@ describe('端侧 Web Crypto 加解密模块', () => {
     await assert.rejects(async () => {
       await decryptData(encrypted, 'WrongPassword');
     });
+  });
+
+  it('按 UTF-8 字节及加密封装计算容量，超限时在加密前拒绝', async () => {
+    const plaintextLimit = (MAX_VAULT_PAYLOAD_BYTES - 2) / 2 - 16 - 12 - 16;
+    const atLimit =
+      '账'.repeat(Math.floor(plaintextLimit / 3)) +
+      'a'.repeat(plaintextLimit % 3);
+    assert.doesNotThrow(() => assertVaultCapacity(atLimit));
+    await assert.rejects(encryptData(atLimit + 'a', 'fixture'), /加密容量上限/);
   });
 });

@@ -3,6 +3,7 @@ import { bankOf } from './banks.js';
 import { channelText } from './i18n.js';
 import { belongsToStatement } from './imports.js';
 import { fromScaledBigInt } from './rewards.js';
+import { categoryForTransaction } from './review.js';
 
 /**
  * 交易列表过滤、统计与安全 CSV 导出工具
@@ -24,7 +25,8 @@ export function filterTransactions(transactions, filters) {
     if (statementId && !belongsToStatement(tx, statementId)) return false;
     if (currency !== 'all' && tx.currency !== currency) return false;
     if (direction !== 'all' && tx.direction !== direction) return false;
-    if (category !== 'all' && tx.category !== category) return false;
+    if (category !== 'all' && categoryForTransaction(tx) !== category)
+      return false;
     if (from && tx.day < from) return false;
     if (to && tx.day > to) return false;
     if (query) {
@@ -80,7 +82,7 @@ export function exportToSafeCsv(
     escapeCell(tx.currency),
     escapeCell(translate(tx.direction === 'credit' ? '入账/还款' : '支出')),
     escapeCell(tx.amount),
-    escapeCell(tx.category || 'spend'),
+    escapeCell(categoryForTransaction(tx)),
     escapeCell(tx.description),
     escapeCell(
       translate(

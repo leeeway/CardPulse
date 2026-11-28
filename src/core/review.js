@@ -19,6 +19,8 @@ export const categoryText = (key) =>
   })[key] || '未知';
 export const categoriesFor = (direction) =>
   direction === 'credit' ? ['credit', 'repayment'] : ['spend', 'fee'];
+export const categoryForTransaction = ({ category, direction }) =>
+  category || categoriesFor(direction)[0];
 export const MAX_BATCH_REVIEW = 100;
 
 function applyReview(transaction, { category, channel }, at) {

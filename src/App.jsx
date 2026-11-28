@@ -28,7 +28,11 @@ import {
   PULSE_REASONS,
 } from './core/rewards.js';
 import { filterTransactions, exportToSafeCsv } from './core/transactions.js';
-import { fetchHkdCnyRate } from './core/exchange.js';
+import {
+  fetchHkdCnyRate,
+  isValidExchangeRate,
+  MAX_EXCHANGE_RATE,
+} from './core/exchange.js';
 import {
   fingerprintFile,
   mergeStatement,
@@ -42,6 +46,7 @@ import {
   reviewTransactions,
   restoreImportedReview,
   undoBatchReview,
+  categoryForTransaction,
   categoryText,
   MAX_BATCH_REVIEW,
 } from './core/review.js';
@@ -82,6 +87,7 @@ import ChangePasswordDialog from './components/ChangePasswordDialog.jsx';
 import PdfPasswordDialog from './components/PdfPasswordDialog.jsx';
 import ImportPreviewDialog from './components/ImportPreviewDialog.jsx';
 import { findImportDuplicates } from './core/duplicate-transactions.js';
+import { assertVaultCapacity } from './core/crypto.js';
 import {
   encryptWorkspace,
   decryptWorkspace,
@@ -204,11 +210,10 @@ export default function App() {
     rateBusy ||
     vaultLocked ||
     !vaultReady;
+  const hasUnsavedChanges = dirty || campaignEditing || rateEditing;
   const idleLockActive = hasVault && vaultReady && !vaultLocked && !isDemo;
   const idleLockBlocked =
-    dirty ||
-    campaignEditing ||
-    rateEditing ||
+    hasUnsavedChanges ||
     showPasswordModal ||
     showChangePassword ||
     Boolean(reviewId) ||
@@ -254,14 +259,14 @@ export default function App() {
     };
   }, []);
   useEffect(() => {
-    if (!dirty) return;
+    if (!hasUnsavedChanges) return;
     const warn = (event) => {
       event.preventDefault();
       event.returnValue = '';
     };
     window.addEventListener('beforeunload', warn);
     return () => window.removeEventListener('beforeunload', warn);
-  }, [dirty]);
+  }, [hasUnsavedChanges]);
 
   const activeTransactions = isDemo ? DEMO_TRANSACTIONS : transactions;
   const bankTransactions = useMemo(
@@ -407,7 +412,7 @@ export default function App() {
   const handleLock = () => {
     if (busyRef.current) return;
     if (
-      (dirty || campaignEditing || rateEditing) &&
+      hasUnsavedChanges &&
       !confirm(t('存在尚未保存的修改，锁定将丢弃这些修改。确认锁定？'))
     )
       return;
@@ -528,12 +533,19 @@ export default function App() {
         const pendingTransactionIds = new Set(
           pendingTransactions.map(({ id }) => id),
         );
+        let capacityWarning;
+        try {
+          assertVaultCapacity(next);
+        } catch {
+          capacityWarning = '保留全部候选交易将超过加密容量上限。';
+        }
         setImportPreview({
           base: workspace,
           next,
           files: results,
           supplementId,
           pendingTransactionIds,
+          capacityWarning,
           transactions: pendingTransactions,
           duplicates: findImportDuplicates(next, pendingTransactionIds),
         });
@@ -571,6 +583,12 @@ export default function App() {
       skippedIds,
     );
     if (next.transactions.length === workspace.transactions.length) return;
+    try {
+      assertVaultCapacity(next);
+    } catch (error) {
+      setImportPreview({ ...importPreview, capacityWarning: error.message });
+      return;
+    }
     const importedStatements = new Map(
       next.statements.map((statement) => [statement.id, statement]),
     );
@@ -625,14 +643,26 @@ export default function App() {
     setVaultBusy(true);
     try {
       if (passwordMode === 'unlock') {
+        const saved = await loadFromVault(masterPassword, { refresh: true });
+        const rate = saved?.exchangeRate;
+        // Older builds could save an out-of-range online rate with a valid ledger.
+        const discardRate =
+          rate?.source === 'Frankfurter' &&
+          Number.isFinite(rate.rate) &&
+          rate.rate > MAX_EXCHANGE_RATE &&
+          isIsoDate(rate.date);
         const data = normalizeWorkspace(
-          await loadFromVault(masterPassword, { refresh: true }),
+          discardRate ? { ...saved, exchangeRate: null } : saved,
         );
         setWorkspace(data);
         setIsDemo(false);
         setVaultLocked(false);
-        setDirty(false);
-        setNotice([]);
+        setDirty(discardRate);
+        setNotice(
+          discardRate
+            ? [{ text: '已移除旧版保存的异常汇率，请重新保存加密库。' }]
+            : [],
+        );
       } else if (passwordMode === 'restore') {
         const data = await decryptWorkspace(pendingBackup, masterPassword);
         if (
@@ -689,7 +719,7 @@ export default function App() {
       } else {
         if (hasVault && !(await loadFromVault(masterPassword)))
           throw new Error('本地库不存在，请刷新后重试');
-        await saveToVault(workspace, masterPassword);
+        await saveToVault(normalizeWorkspace(workspace), masterPassword);
         setHasVault(true);
         setVaultLocked(false);
         setDirty(false);
@@ -905,21 +935,21 @@ export default function App() {
   };
   const applyRate = (value) => {
     if (unavailable || isDemo || busyRef.current) return;
+    const exchangeRate = {
+      rate: Number(value),
+      date: getHongKongDate(),
+      source: 'manual',
+    };
     if (
       !/^\d+(?:\.\d{1,8})?$/.test(value) ||
-      !(Number(value) > 0) ||
-      Number(value) > 10000
+      !isValidExchangeRate(exchangeRate)
     ) {
       setNotice([{ text: '汇率格式无效' }]);
       return;
     }
     setWorkspace((prev) => ({
       ...prev,
-      exchangeRate: {
-        rate: Number(value),
-        date: getHongKongDate(),
-        source: 'manual',
-      },
+      exchangeRate,
     }));
     setDirty(true);
     return true;
@@ -932,7 +962,7 @@ export default function App() {
       const info = await fetchHkdCnyRate({
         signal: AbortSignal.timeout(10000),
       });
-      if (!(info.rate > 0) || !isIsoDate(info.date))
+      if (!isValidExchangeRate(info))
         throw new Error('汇率暂不可用');
       setWorkspace((prev) => ({ ...prev, exchangeRate: info }));
       setDirty(true);
@@ -1836,10 +1866,7 @@ export default function App() {
                         <strong>{tx.description}</strong>
                         <small>
                           {t(
-                            categoryText(
-                              tx.category ||
-                                (tx.direction === 'credit' ? 'credit' : 'spend'),
-                            ),
+                            categoryText(categoryForTransaction(tx)),
                           )}
                           {tx.reviewHistory?.length > 0 &&
                             ` · ${t('已人工修正')}`}

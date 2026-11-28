@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   categoriesFor,
+  categoryForTransaction,
   categoryText,
   reviewTransactions,
   REVIEW_CHANNELS,
@@ -71,7 +72,7 @@ export default function BatchReviewDialog({
     return () => dialog.close();
   }, []);
   const describe = (tx) =>
-    `${t(categoryText(tx.category))} · ${t(tx.channel?.uncertain ? '待确认渠道' : channelText(tx.channel?.key))}`;
+    `${t(categoryText(categoryForTransaction(tx)))} · ${t(tx.channel?.uncertain ? '待确认渠道' : channelText(tx.channel?.key))}`;
   const updateField = (setter, value) => {
     setter(value);
     setPreview(null);

@@ -2,6 +2,7 @@ import { validateCampaign } from './campaigns.js';
 import { isIsoDate } from './campaigns.js';
 import { cents } from './reconciliation.js';
 import { isProgressive } from './campaign-tiers.js';
+import { isValidExchangeRate } from './exchange.js';
 export const emptyWorkspace = () => ({
   version: 2,
   transactions: [],
@@ -125,14 +126,7 @@ export function normalizeWorkspace(data) {
     )
   )
     throw new Error('本地库不存在或格式无效');
-  if (
-    data.exchangeRate != null &&
-    (!(data.exchangeRate.rate > 0) ||
-      !Number.isFinite(data.exchangeRate.rate) ||
-      data.exchangeRate.rate > 10000 ||
-      !isIsoDate(data.exchangeRate.date) ||
-      !['manual', 'Frankfurter'].includes(data.exchangeRate.source))
-  )
+  if (data.exchangeRate != null && !isValidExchangeRate(data.exchangeRate))
     throw new Error('汇率格式无效');
   const campaigns = (data.campaigns || []).map(validateCampaign);
   if (!uniqueIds(campaigns)) throw new Error('本地库不存在或格式无效');
