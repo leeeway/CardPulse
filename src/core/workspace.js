@@ -1,8 +1,7 @@
-import { validateCampaign } from './campaigns.js';
-import { isIsoDate } from './campaigns.js';
+import { isIsoDate, validateCampaign } from './campaigns.js';
 import { cents } from './reconciliation.js';
 import { isProgressive } from './campaign-tiers.js';
-import { isValidExchangeRate } from './exchange.js';
+import { isValidExchangeRate, MAX_EXCHANGE_RATE } from './exchange.js';
 export const emptyWorkspace = () => ({
   version: 2,
   transactions: [],
@@ -50,6 +49,22 @@ const validHistory = (value) =>
         validSnapshot(change.before) &&
         validSnapshot(change.after),
     ));
+
+export function normalizeStoredWorkspace(data) {
+  const rate = data?.exchangeRate;
+  // Older builds could save an out-of-range online rate with a valid ledger.
+  const discardedRate =
+    rate?.source === 'Frankfurter' &&
+    Number.isFinite(rate.rate) &&
+    rate.rate > MAX_EXCHANGE_RATE &&
+    isIsoDate(rate.date);
+  return {
+    workspace: normalizeWorkspace(
+      discardedRate ? { ...data, exchangeRate: null } : data,
+    ),
+    discardedRate,
+  };
+}
 
 export function normalizeWorkspace(data) {
   if (

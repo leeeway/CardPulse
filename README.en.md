@@ -42,6 +42,8 @@ Desktop records are stored in the current OS user profile: `~/Library/Applicatio
 - The web app uses IndexedDB; the desktop app uses a local encrypted file. They do not sync automatically.
 - Unlock your existing web vault and export an encrypted backup. Restore that backup in the desktop app with its password. After confirmation, restore replaces the destination’s transactions, campaigns, and rate settings. Back up existing records first.
 - `.cardpulse` backups contain AES-GCM ciphertext, not CSV. Forgotten passwords cannot be recovered. A backup includes the current workspace but does not replace saving the local vault.
+- The desktop app on the main branch requires you to save a copy of the existing vault to a new file before restoring a backup. Canceling, choosing an existing filename, or failing to save the copy leaves the original vault in place. You can also use this flow to restore a compatible backup when the local vault file is damaged. The copy retains its original password, and the restored vault uses the backup password.
+- If a save fails, you can retry or export the current workspace as an encrypted backup. After an unexpected exit, you can unlock the last successfully saved data. Unsaved changes and drafts are kept in the current session only.
 - There is no cloud sync, telemetry, or automatic updater. Download a new installer to upgrade.
 
 ## Quick start

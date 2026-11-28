@@ -20,7 +20,15 @@ const {
   resolveAsset,
   isExternalUrl,
 } = require('./security.cjs');
-const { readVault, writeVault, validatePayload } = require('./vault.cjs');
+const {
+  readVault,
+  readLocalVault,
+  writeVault,
+  validatePayload,
+  copyVaultBeforeRestore,
+  isVaultTemporaryName,
+  removeAbandonedVaultWrites,
+} = require('./vault.cjs');
 
 app.setName('CardPulse');
 app.setAppUserModelId('io.cardpulse.desktop');
@@ -47,6 +55,45 @@ protocol.registerSchemesAsPrivileged([
 let window;
 const dist = path.join(__dirname, '..', 'dist');
 const vaultPath = () => path.join(app.getPath('userData'), 'vault.cardpulse');
+let vaultOperation = Promise.resolve();
+let pendingVaultOperations = 0;
+
+function mutateVault(expected, operation) {
+  pendingVaultOperations += 1;
+  const result = vaultOperation.then(async () => {
+    const file = vaultPath();
+    const current = await readLocalVault(file);
+    if (current !== expected) return false;
+    return operation(file, current);
+  });
+  vaultOperation = result.catch(() => {});
+  return result.finally(() => {
+    pendingVaultOperations -= 1;
+  });
+}
+
+async function backupDestination(selection) {
+  const name = path.basename(selection);
+  const directory = await fs.realpath(path.dirname(path.resolve(selection)));
+  const vault = vaultPath();
+  const localDirectory = await fs.realpath(path.dirname(vault));
+  const file = path.join(directory, name);
+  const activeFile = path.join(localDirectory, path.basename(vault));
+  const stat = (target) =>
+    fs.stat(target, { bigint: true }).catch((error) => {
+      if (error.code === 'ENOENT') return null;
+      throw error;
+    });
+  const [destination, active] = await Promise.all([stat(file), stat(activeFile)]);
+  if (
+    (directory === localDirectory &&
+      name.toLowerCase() === path.basename(vault).toLowerCase()) ||
+    (active && destination?.dev === active.dev && destination?.ino === active.ino) ||
+    (directory === localDirectory && isVaultTemporaryName(activeFile, name))
+  )
+    throw new Error('请选择其他备份位置');
+  return file;
+}
 
 function registerHandler(channel, handler) {
   ipcMain.handle(channel, async (event, ...args) => {
@@ -87,15 +134,46 @@ function registerStorage() {
     );
     return true;
   });
-  registerHandler('vault:read', () => readVault(vaultPath()));
-  registerHandler('vault:write', async (payload) => {
-    await writeVault(vaultPath(), payload);
-    return true;
-  });
-  registerHandler('vault:clear', async () => {
-    await fs.rm(vaultPath(), { force: true });
-    return true;
-  });
+  registerHandler('vault:read', () => readLocalVault(vaultPath()));
+  registerHandler('vault:write', (payload, expected) =>
+    mutateVault(expected, async (file, current) => {
+      if (current === false)
+        throw new Error('本地库文件格式无效，请恢复加密备份。');
+      await writeVault(file, payload);
+      return true;
+    }),
+  );
+  registerHandler('vault:clear', (expected) =>
+    mutateVault(expected, async (file, current) => {
+      if (current === false)
+        throw new Error('本地库文件格式无效，请恢复加密备份。');
+      await fs.rm(file, { force: true });
+      return true;
+    }),
+  );
+  registerHandler('vault:restore', (payload, expected) =>
+    mutateVault(expected, async (file, current) => {
+      validatePayload(payload);
+      if (current !== null) {
+        const result = await dialog.showSaveDialog(window, {
+          title: 'Save the vault before restoring / 保存恢复前的本地库副本',
+          defaultPath: `CardPulse-before-restore-${new Date().toISOString().replace(/[:.]/g, '-')}.cardpulse`,
+          filters: [
+            { name: 'CardPulse encrypted backup', extensions: ['cardpulse'] },
+          ],
+        });
+        if (result.canceled || !result.filePath) return null;
+        if ((await readLocalVault(file)) !== current) return false;
+        await copyVaultBeforeRestore(
+          file,
+          await backupDestination(result.filePath),
+        );
+        if ((await readLocalVault(file)) !== current) return false;
+      }
+      await writeVault(file, payload);
+      return true;
+    }),
+  );
   registerHandler('backup:export', async (payload) => {
     validatePayload(payload);
     const result = await dialog.showSaveDialog(window, {
@@ -107,9 +185,8 @@ function registerStorage() {
     });
     if (result.canceled || !result.filePath) return false;
     // Never allow an export to silently overwrite the active application vault.
-    if (path.resolve(result.filePath) === path.resolve(vaultPath()))
-      throw new Error('请选择其他备份位置');
-    await writeVault(result.filePath, payload);
+    // A directory symlink can alias the vault while keeping the same basename.
+    await writeVault(await backupDestination(result.filePath), payload);
     return true;
   });
   registerHandler('backup:import', async () => {
@@ -186,6 +263,9 @@ function createWindow() {
     });
     if (choice === 1) event.preventDefault();
   });
+  window.on('close', (event) => {
+    if (pendingVaultOperations) event.preventDefault();
+  });
   window.once('ready-to-show', () => window.show());
   window.on('closed', () => {
     window = null;
@@ -203,7 +283,8 @@ else {
   });
   app
     .whenReady()
-    .then(() => {
+    .then(async () => {
+      await removeAbandonedVaultWrites(vaultPath());
       session.defaultSession.setPermissionRequestHandler(
         (contents, permission, callback) => callback(false),
       );

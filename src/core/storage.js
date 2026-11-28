@@ -27,7 +27,11 @@ async function accessVault(mode, operation) {
   const db = await openDatabase();
   try {
     return await new Promise((resolve, reject) => {
-      const tx = db.transaction(STORE_NAME, mode);
+      const tx = db.transaction(
+        STORE_NAME,
+        mode,
+        mode === 'readwrite' ? { durability: 'strict' } : undefined,
+      );
       const request = operation(tx.objectStore(STORE_NAME));
       tx.oncomplete = () => resolve(request.result);
       tx.onabort = () => reject(tx.error || new Error('本地存储事务已中止'));
@@ -49,7 +53,7 @@ function conflictError() {
 
 async function readPayload() {
   if (globalThis.cardpulseDesktop)
-    return (await globalThis.cardpulseDesktop.readVault()) || null;
+    return await globalThis.cardpulseDesktop.readVault();
   const record = await accessVault('readonly', (store) =>
     store.get('vault_payload'),
   );
@@ -91,25 +95,35 @@ export function createVaultClient() {
   const assertCurrent = (payload) => {
     if (baseline !== undefined && payload !== baseline) throw conflictError();
   };
-  const write = async (expected, payload) => {
-    if (globalThis.cardpulseDesktop) {
-      // Desktop already permits only one app instance per profile.
-      if ((await readPayload()) !== expected) throw conflictError();
-      if (payload === null) await globalThis.cardpulseDesktop.clearVault();
-      else await globalThis.cardpulseDesktop.writeVault(payload);
+  const write = async (expected, payload, restore = false) => {
+    const desktop = globalThis.cardpulseDesktop;
+    if (desktop) {
+      const result = restore
+        ? await desktop.restoreVault(payload, expected)
+        : payload === null
+          ? await desktop.clearVault(expected)
+          : await desktop.writeVault(payload, expected);
+      if (result === false) throw conflictError();
+      if (result === null) return false;
     } else await writeBrowserPayload(expected, payload);
     baseline = payload;
+    return true;
   };
   return {
     async hasEncryptedVault() {
       const payload = await readPayload();
       if (baseline === undefined) baseline = payload;
-      return Boolean(payload);
+      return payload !== null;
     },
     async saveToVault(data, password) {
       const expected = await initialize();
       const payload = await encryptData(data, password);
       await write(expected, payload);
+    },
+    async restoreToVault(data, password) {
+      const expected = await initialize();
+      const payload = await encryptData(data, password);
+      return write(expected, payload, true);
     },
     async changePassword(currentPassword, newPassword) {
       if (!currentPassword) throw new Error('请输入当前密码');
@@ -136,6 +150,8 @@ export function createVaultClient() {
     ) {
       const payload = await readPayload();
       if (!refresh && checkSnapshot) assertCurrent(payload);
+      if (payload === false)
+        throw new Error('本地库文件格式无效，请恢复加密备份。');
       if (!payload) {
         if (refresh || baseline === undefined) baseline = null;
         return null;

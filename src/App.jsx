@@ -31,7 +31,6 @@ import { filterTransactions, exportToSafeCsv } from './core/transactions.js';
 import {
   fetchHkdCnyRate,
   isValidExchangeRate,
-  MAX_EXCHANGE_RATE,
 } from './core/exchange.js';
 import {
   fingerprintFile,
@@ -69,6 +68,7 @@ import {
 import { translate, channelText } from './core/i18n.js';
 import {
   normalizeWorkspace,
+  normalizeStoredWorkspace,
   emptyWorkspace,
   hasWorkspaceData,
 } from './core/workspace.js';
@@ -90,12 +90,11 @@ import { findImportDuplicates } from './core/duplicate-transactions.js';
 import { assertVaultCapacity } from './core/crypto.js';
 import {
   encryptWorkspace,
-  decryptWorkspace,
+  readBackupWorkspace,
   serializeBackup,
   parseBackup,
   MAX_BACKUP_BYTES,
 } from './core/backup.js';
-import { isIsoDate } from './core/campaigns.js';
 import { instantiateCampaignRules } from './core/campaign-rules.js';
 
 const emptyFilters = () => ({
@@ -122,6 +121,7 @@ export default function App() {
   const [
     {
       saveToVault,
+      restoreToVault,
       loadFromVault,
       clearVault,
       hasEncryptedVault,
@@ -211,6 +211,7 @@ export default function App() {
     vaultLocked ||
     !vaultReady;
   const hasUnsavedChanges = dirty || campaignEditing || rateEditing;
+  const protectWorkspaceOnExit = hasUnsavedChanges || vaultBusy;
   const idleLockActive = hasVault && vaultReady && !vaultLocked && !isDemo;
   const idleLockBlocked =
     hasUnsavedChanges ||
@@ -259,14 +260,14 @@ export default function App() {
     };
   }, []);
   useEffect(() => {
-    if (!hasUnsavedChanges) return;
+    if (!protectWorkspaceOnExit) return;
     const warn = (event) => {
       event.preventDefault();
       event.returnValue = '';
     };
     window.addEventListener('beforeunload', warn);
     return () => window.removeEventListener('beforeunload', warn);
-  }, [hasUnsavedChanges]);
+  }, [protectWorkspaceOnExit]);
 
   const activeTransactions = isDemo ? DEMO_TRANSACTIONS : transactions;
   const bankTransactions = useMemo(
@@ -644,36 +645,35 @@ export default function App() {
     try {
       if (passwordMode === 'unlock') {
         const saved = await loadFromVault(masterPassword, { refresh: true });
-        const rate = saved?.exchangeRate;
-        // Older builds could save an out-of-range online rate with a valid ledger.
-        const discardRate =
-          rate?.source === 'Frankfurter' &&
-          Number.isFinite(rate.rate) &&
-          rate.rate > MAX_EXCHANGE_RATE &&
-          isIsoDate(rate.date);
-        const data = normalizeWorkspace(
-          discardRate ? { ...saved, exchangeRate: null } : saved,
-        );
+        const { workspace: data, discardedRate } =
+          normalizeStoredWorkspace(saved);
         setWorkspace(data);
         setIsDemo(false);
         setVaultLocked(false);
-        setDirty(discardRate);
+        setDirty(discardedRate);
         setNotice(
-          discardRate
+          discardedRate
             ? [{ text: '已移除旧版保存的异常汇率，请重新保存加密库。' }]
             : [],
         );
       } else if (passwordMode === 'restore') {
-        const data = await decryptWorkspace(pendingBackup, masterPassword);
-        if (
-          !confirm(
-            t(
-              '恢复将替换本地交易、活动和汇率设置，请先备份现有数据。确认恢复？',
-            ),
-          )
-        )
+        const { workspace: data, discardedRate } = await readBackupWorkspace(
+          pendingBackup,
+          masterPassword,
+        );
+        const restoreMessage =
+          globalThis.cardpulseDesktop && hasVault
+            ? '恢复会替换本地账本。下一步请选择新文件名，保存当前本地库的副本。'
+            : '恢复将替换本地交易、活动和汇率设置，请先备份现有数据。确认恢复？';
+        const unsavedWarning = hasUnsavedChanges
+          ? '\n\n' +
+            t('工作区有未保存的修改或草稿。继续恢复会丢弃这些内容；如需保留，请取消并先保存。')
+          : '';
+        if (!confirm(t(restoreMessage) + unsavedWarning)) return;
+        if (!(await restoreToVault(data, masterPassword))) {
+          setPasswordError('已取消保存原库副本，本地保险库未替换。');
           return;
-        await saveToVault(data, masterPassword);
+        }
         backupReminder.invalidate('restored');
         setWorkspaceSession((value) => value + 1);
         setReviewId(null);
@@ -687,7 +687,12 @@ export default function App() {
         setIsDemo(false);
         setActiveBank('all');
         setFilters(emptyFilters());
-        setNotice([{ text: '已恢复加密备份' }]);
+        setNotice([
+          { text: '已恢复加密备份' },
+          ...(discardedRate
+            ? [{ text: '已移除旧版备份中的异常汇率，交易和活动已保留。' }]
+            : []),
+        ]);
       } else if (passwordMode === 'backup') {
         const exportToken = backupReminder.beginExport();
         // Export remains available after a conflict without rebasing this page.
@@ -896,7 +901,7 @@ export default function App() {
     resolve?.(password);
   };
   const pickBackup = async () => {
-    if (busyRef.current || !vaultReady) return;
+    if (busyRef.current || !vaultReady || importPreview) return;
     if (!globalThis.cardpulseDesktop) {
       backupInputRef.current?.click();
       return;
@@ -917,7 +922,7 @@ export default function App() {
     }
   };
   const readBackupFile = async (file) => {
-    if (!file || busyRef.current || !vaultReady) return;
+    if (!file || busyRef.current || !vaultReady || importPreview) return;
     busyRef.current = true;
     setVaultBusy(true);
     try {
@@ -1337,7 +1342,13 @@ export default function App() {
           />
           <button
             className="btn btn-secondary"
-            disabled={loadingFile || vaultBusy || rateBusy || !vaultReady}
+            disabled={
+              loadingFile ||
+              vaultBusy ||
+              rateBusy ||
+              !vaultReady ||
+              Boolean(importPreview)
+            }
             onClick={pickBackup}
           >
             <FolderOpen size={14} />

@@ -1,5 +1,5 @@
 import { encryptData, decryptData, MAX_VAULT_PAYLOAD_BYTES } from './crypto.js';
-import { normalizeWorkspace } from './workspace.js';
+import { normalizeStoredWorkspace, normalizeWorkspace } from './workspace.js';
 export const MAX_BACKUP_BYTES = MAX_VAULT_PAYLOAD_BYTES;
 export function validateEncryptedPayload(payload) {
   if (
@@ -39,8 +39,16 @@ export async function encryptWorkspace(data, password) {
     await encryptData(normalizeWorkspace(data), password),
   );
 }
+export async function readBackupWorkspace(payload, password) {
+  const ciphertext = validateEncryptedPayload(payload);
+  let data;
+  try {
+    data = await decryptData(ciphertext, password);
+  } catch {
+    throw new Error('备份密码不正确或文件已损坏');
+  }
+  return normalizeStoredWorkspace(data);
+}
 export async function decryptWorkspace(payload, password) {
-  return normalizeWorkspace(
-    await decryptData(validateEncryptedPayload(payload), password),
-  );
+  return (await readBackupWorkspace(payload, password)).workspace;
 }

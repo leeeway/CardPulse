@@ -7,8 +7,11 @@ contextBridge.exposeInMainWorld(
     arch: process.arch,
     copyBuildInfo: () => ipcRenderer.invoke('build:copy-info'),
     readVault: () => ipcRenderer.invoke('vault:read'),
-    writeVault: (payload) => ipcRenderer.invoke('vault:write', payload),
-    clearVault: () => ipcRenderer.invoke('vault:clear'),
+    writeVault: (payload, expected) =>
+      ipcRenderer.invoke('vault:write', payload, expected),
+    clearVault: (expected) => ipcRenderer.invoke('vault:clear', expected),
+    restoreVault: (payload, expected) =>
+      ipcRenderer.invoke('vault:restore', payload, expected),
     exportBackup: (payload) => ipcRenderer.invoke('backup:export', payload),
     importBackup: () => ipcRenderer.invoke('backup:import'),
     fetchReferenceRate: () => ipcRenderer.invoke('rates:fetch'),
